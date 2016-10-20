@@ -1,0 +1,59 @@
+# -*- coding: utf-8 -*-
+
+import datetime
+import calendar
+
+
+class DBParser(object):
+
+    def json_put(self, item, path, value):
+        tab = path.split(u".")
+        if tab[0] not in item and len(tab) > 1:
+            item[tab[0]] = {}
+        if len(tab) == 1:
+            item[tab[0]] = value
+        else:
+            item[tab[0]] = self.json_put(item[tab[0]], u".".join(tab[1:]), value)
+        return item
+
+    def python_type_to_json(self, val):
+        if type(val) in [long, float]:
+            return float(val)
+        elif type(val) is str:
+            return val.decode('utf-8')
+        elif type(val) is datetime.datetime:
+            return calendar.timegm(val.timetuple())
+        else:
+            return val
+
+    def rows_to_json(self, table, headers, rows):
+        headers = self.get_formatted_header_for_json(headers)
+        items = []
+        for row in rows:
+            item = {}
+            for index, cell in enumerate(row):
+                cell = self.python_type_to_json(cell)
+                if table in headers[index]:
+                    item[headers[index].replace(table + u".", u"")] = cell
+                else:
+                    self.json_put(item, headers[index], cell)
+
+            items.append(item)
+        return items
+
+    def get_formatted_header_for_json(self, headers):
+        formated_headers = []
+
+        for header in headers:
+
+            while header.find(u"_") != -1:
+                found = header.find(u"_")
+                header = header[:found] + header[found+1].upper() + header[found+2:]
+
+            formated_headers.append(header)
+        return formated_headers
+
+    def parse_filters(self, filters, operator=u"AND"):
+        if type(filters) is not list:
+            filters = [filters]
+
