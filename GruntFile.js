@@ -10,7 +10,6 @@ module.exports = function(grunt) {
             "command" : [
               "rm -rf lib/ venv/",
               "virtualenv venv",
-              "mkdir lib",
               grunt.template.process(
                 "export SDK_APP_ENGINE_PATH=<%=SDK_APP_ENGINE_PATH%>",
                 {
