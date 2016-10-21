@@ -2,7 +2,7 @@
 
 import datetime
 import calendar
-
+import re
 
 class DBParser(object):
 
@@ -26,17 +26,24 @@ class DBParser(object):
         else:
             return val
 
+    def get_table_column_from_header(self, headers):
+        decomposed = [(re.search(u"`(\S+)+`\.*`(\S+)+`", header)).groups() for header in headers]
+
+
+        return decomposed
+
     def rows_to_json(self, table, headers, rows):
-        headers = self.get_formatted_header_for_json(headers)
+
+        decomposed_headers = self.get_table_column_from_header(headers)
         items = []
         for row in rows:
             item = {}
             for index, cell in enumerate(row):
                 cell = self.python_type_to_json(cell)
-                if table in headers[index]:
-                    item[headers[index].replace(table + u".", u"")] = cell
+                if table == decomposed_headers[index][0]:
+                    item[decomposed_headers[index][1]] = cell
                 else:
-                    self.json_put(item, headers[index], cell)
+                    self.json_put(item, decomposed_headers[index][0] + u"." + decomposed_headers[index][1], cell)
 
             items.append(item)
         return items
