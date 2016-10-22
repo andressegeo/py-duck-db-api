@@ -6,6 +6,19 @@ import re
 
 class DBParser(object):
 
+    def __init__(self):
+
+        self._OPERATORS = {
+            u"$eq" : u"=",
+            u"$gt" : u">",
+            u"$gte" : u">=",
+            u"$lt" : u"<",
+            u"$lte": u"<=",
+            u"$ne": u"!="
+        }
+
+
+
     def json_put(self, item, path, value):
         tab = path.split(u".")
         if tab[0] not in item and len(tab) > 1:
@@ -48,6 +61,7 @@ class DBParser(object):
             items.append(item)
         return items
 
+
     def get_formatted_header_for_json(self, headers):
         formated_headers = []
 
@@ -63,4 +77,23 @@ class DBParser(object):
     def parse_filters(self, filters, operator=u"AND"):
         if type(filters) is not list:
             filters = [filters]
+        filters = filters or []
+        where = {
+            u"statments" : [],
+            u"values" : []
+        }
+
+        for filter in filters:
+            if type(filter) is list:
+                pass
+            elif type(filter) is dict:
+                for key in filter:
+                    # If operator
+                    if key[0] == u"$" and key in self._OPERATORS:
+                        where[u"statments"].append()
+                    # If field
+                    else:
+                        pass
+
+
 

@@ -74,7 +74,7 @@ class DBConnection(object):
 
         return headers
 
-    def select(self, table):
+    def select(self, table, where=None):
         referenced = self.get_referenced(table)
         headers = self.get_headers(table)
 

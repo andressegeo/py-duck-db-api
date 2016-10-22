@@ -3,8 +3,8 @@
 from db_api.db_connection import DBConnection
 from flask import jsonify
 
-class DBFlaskAPI(object):
 
+class DBFlaskAPI(object):
 
     def __init__(
             self,
@@ -19,7 +19,17 @@ class DBFlaskAPI(object):
         result = {}
 
         if request.method == u"GET":
-            headers, rows = self.db_connection.select(table)
+
+            filters = request.args.get(u'filters')
+
+            filters = {
+                u"$eq": [u"$issue", u"test"]
+            }
+
+            headers, rows = self.db_connection.select(
+                table=table,
+                where=self.db_parser.parse_filters(filters)
+            )
 
             result = self.db_parser.rows_to_json(table, headers, rows)
 
