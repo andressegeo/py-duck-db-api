@@ -17,8 +17,6 @@ class DBParser(object):
             u"$ne": u"!="
         }
 
-
-
     def json_put(self, item, path, value):
         tab = path.split(u".")
         if tab[0] not in item and len(tab) > 1:
@@ -79,8 +77,8 @@ class DBParser(object):
             filters = [filters]
         filters = filters or []
         where = {
-            u"statments" : [],
-            u"values" : []
+            u"statements": [],
+            u"values": []
         }
 
         for filter in filters:
@@ -89,8 +87,8 @@ class DBParser(object):
             elif type(filter) is dict:
                 for key in filter:
                     # If operator
-                    if key[0] == u"$" and key in self._OPERATORS:
-                        where[u"statments"].append()
+                    if key in self._OPERATORS:
+                        where[u"statements"].append()
                     # If field
                     else:
                         pass
