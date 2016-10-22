@@ -4,9 +4,10 @@ import datetime
 import calendar
 import re
 
+
 class DBParser(object):
 
-    def __init__(self):
+    def __init__(self, table, headers, referenced):
 
         self._OPERATORS = {
             u"$eq" : u"=",
@@ -16,6 +17,15 @@ class DBParser(object):
             u"$lte": u"<=",
             u"$ne": u"!="
         }
+
+        self._RECURSIVE_OPERATORS = {
+            u"$and": u"AND",
+            u"$or": u"OR"
+        }
+
+        self._headers = headers
+        self._referenced = referenced
+        self._table = table
 
     def json_put(self, item, path, value):
         tab = path.split(u".")
@@ -62,7 +72,6 @@ class DBParser(object):
 
     def get_formatted_header_for_json(self, headers):
         formated_headers = []
-
         for header in headers:
 
             while header.find(u"_") != -1:
@@ -71,6 +80,28 @@ class DBParser(object):
 
             formated_headers.append(header)
         return formated_headers
+
+    def get_json_for_formatted_header(self, json_field):
+        def insert_underscore(input):
+            indexes = [i for i, ltr in enumerate(input) if ltr.isupper()]
+            indexes.reverse()
+            for index in indexes:
+                input = input[0:index] + u"_" + input[index:].lower()
+            return input
+
+        # Not a referenced field
+        if u"." not in json_field:
+            return u"`" + insert_underscore(self._table) + u"`.`" + insert_underscore(json_field) + u"`"
+        # Reference field
+        else:
+            table, field = tuple(json_field.split(u"."))
+            return u"`" + insert_underscore(table) + u"`.`" + insert_underscore(field) + u"`"
+
+    def is_field(self, key):
+        db_field = self.get_json_for_formatted_header(key)
+        if db_field in self._headers:
+            return True
+        return False
 
     def parse_filters(self, filters, operator=u"AND"):
         if type(filters) is not list:
@@ -86,12 +117,14 @@ class DBParser(object):
                 pass
             elif type(filter) is dict:
                 for key in filter:
-                    # If operator
-                    if key in self._OPERATORS:
-                        where[u"statements"].append()
-                    # If field
+                    # If key is an operator
+                    if self.is_field(key):
+                        pass
                     else:
                         pass
+
+        where[u"statements"] = operator.join(where[u"statements"])
+        return where
 
 
 

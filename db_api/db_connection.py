@@ -50,6 +50,7 @@ class DBConnection(object):
     def get_headers(self, table):
 
         referenced = self.get_referenced(table)
+        print(u"referenced")
         print(referenced)
         cursor = self._db.cursor()
 
@@ -71,7 +72,7 @@ class DBConnection(object):
 
         for foreign_table in foreign_tables:
             headers += self.get_headers(foreign_table)
-
+        print(u"headers")
         print(headers)
         return headers
 

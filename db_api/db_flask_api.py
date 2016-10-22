@@ -20,15 +20,15 @@ class DBFlaskAPI(object):
 
         if request.method == u"GET":
 
-            filters = request.args.get(u'filters')
-
-            filters = {
-                u"$eq": [u"$issue", u"test"]
-            }
+            # filters = request.args.get(u'filters')
+            #
+            # filters = {
+            #     u"$eq": [u"$issue", u"test"]
+            # }
 
             headers, rows = self.db_connection.select(
                 table=table,
-                where=self.db_parser.parse_filters(filters)
+                where=u""
             )
 
             result = self.db_parser.rows_to_json(table, headers, rows)
