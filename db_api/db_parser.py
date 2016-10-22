@@ -70,10 +70,9 @@ class DBParser(object):
         return items
 
 
-    def get_formatted_header_for_json(self, headers):
+    def formatted_header_to_json(self, headers):
         formated_headers = []
         for header in headers:
-
             while header.find(u"_") != -1:
                 found = header.find(u"_")
                 header = header[:found] + header[found+1].upper() + header[found+2:]
@@ -81,7 +80,8 @@ class DBParser(object):
             formated_headers.append(header)
         return formated_headers
 
-    def get_json_for_formatted_header(self, json_field):
+
+    def json_to_formatted_header(self, json_field):
         def insert_underscore(input):
             indexes = [i for i, ltr in enumerate(input) if ltr.isupper()]
             indexes.reverse()
@@ -98,12 +98,12 @@ class DBParser(object):
             return u"`" + insert_underscore(table) + u"`.`" + insert_underscore(field) + u"`"
 
     def is_field(self, key):
-        db_field = self.get_json_for_formatted_header(key)
+        db_field = self.json_to_formatted_header(key)
         if db_field in self._headers:
             return True
         return False
 
-    def parse_filters(self, filters, operator=u"AND"):
+    def parse_filters(self, filters, operator=u"AND", parent=None):
         if type(filters) is not list:
             filters = [filters]
         filters = filters or []
@@ -113,17 +113,26 @@ class DBParser(object):
         }
 
         for filter in filters:
-            if type(filter) is list:
-                pass
-            elif type(filter) is dict:
-                for key in filter:
-                    # If key is an operator
-                    if self.is_field(key):
-                        pass
-                    else:
-                        pass
-
-        where[u"statements"] = operator.join(where[u"statements"])
+            for key in filter:
+                # If key is an operator
+                if self.is_field(key):
+                    db_field = self.json_to_formatted_header(key)
+                    if type(filter[key]) in [unicode, str]:
+                        where[u"statements"].append(db_field + u" = %s")
+                        where[u"values"].append(filter[key])
+                    elif type(filter[key]) is dict:
+                        ret = self.parse_filters(filter[key], parent=key)
+                        where[u"statements"].append(ret[u"statements"])
+                        where[u"values"] += ret[u"values"]
+                elif key in self._OPERATORS and parent is not None:
+                    db_field = self.json_to_formatted_header(parent)
+                    where[u"statements"].append(db_field + u" " + self._OPERATORS[key] + u" %s")
+                    where[u"values"].append(filter[key])
+                elif key in self._RECURSIVE_OPERATORS:
+                    ret = self.parse_filters(filter[key], self._RECURSIVE_OPERATORS[key], parent=key)
+                    where[u"statements"].append(u"(" + ret[u"statements"] + u")")
+                    where[u"values"] += ret[u"values"]
+        where[u"statements"] = (u" " + operator + u" ").join(where[u"statements"])
         return where
 
 
