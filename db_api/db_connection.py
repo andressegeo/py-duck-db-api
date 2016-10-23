@@ -135,4 +135,6 @@ class DBConnection(object):
         cursor = self._db.cursor()
 
         cursor.execute(insert[u'statements'], insert[u"values"])
+        print("insert")
+        cursor.connection.commit()
         return cursor.lastrowid
