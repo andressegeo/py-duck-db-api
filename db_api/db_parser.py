@@ -127,10 +127,10 @@ class DBParser(object):
                 if self.is_field(key):
 
                     db_field = self.json_to_header(key)
-
+                    value = self.get_wrapped_values([db_field], [filter[key]])
                     if type(filter[key]) in [unicode, str, int, float]:
 
-                        where[u"statements"].append(db_field + u" = %s")
+                        where[u"statements"].append(db_field + u" = " + value)
                         where[u"values"].append(filter[key])
 
                     elif type(filter[key]) is dict:
@@ -142,7 +142,8 @@ class DBParser(object):
                 elif key in self._OPERATORS and parent is not None:
 
                     db_field = self.json_to_header(parent)
-                    where[u"statements"].append(db_field + u" " + self._OPERATORS[key] + u" %s")
+                    value = self.get_wrapped_values([db_field], [filter[key]])
+                    where[u"statements"].append(db_field + u" " + self._OPERATORS[key] + u" " + value)
                     where[u"values"].append(filter[key])
 
                 elif key in self._RECURSIVE_OPERATORS:
@@ -152,6 +153,7 @@ class DBParser(object):
                     where[u"values"] += ret[u"values"]
 
         where[u"statements"] = (u" " + operator + u" ").join(where[u"statements"])
+
         return where
 
     def parse_update(self, data):
