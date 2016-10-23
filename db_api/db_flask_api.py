@@ -30,13 +30,19 @@ class DBFlaskAPI(object):
 
         db_parser = self.__db_parser_def(
             table=table,
-            headers=self.db_connection.get_headers(table),
+            columns=self.db_connection.get_columns(table),
             referenced=self.db_connection.get_referenced(table)
         )
 
         filters = request.args.get(u'filters')
-        if filter is not None:
+        data = request.data
+
+        if filters is not None:
             filters = json.loads(filters, encoding=u"utf-8")
+
+        if data is not None and data != u"":
+
+            data = json.loads(data, encoding=u"utf-8")
 
         if request.method == u"GET":
             headers, rows = self.db_connection.select(
@@ -44,8 +50,21 @@ class DBFlaskAPI(object):
                 where=db_parser.parse_filters(filters)
             )
 
-            result = db_parser.rows_to_json(table, headers, rows)
+            result = {
+                u"items": db_parser.rows_to_json(table, headers, rows)
+            }
 
+        elif request.method == u"PUT":
+            count = self.db_connection.update(
+                table=table,
+                update=db_parser.parse_update(
+                    data=data
+                ),
+                where=db_parser.parse_filters(filters)
+            )
 
+            result = {
+                u"count": count
+            }
 
         return jsonify(result)

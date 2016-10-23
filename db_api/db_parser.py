@@ -7,7 +7,7 @@ import re
 
 class DBParser(object):
 
-    def __init__(self, table, headers, referenced):
+    def __init__(self, table, columns, referenced):
 
         self._OPERATORS = {
             u"$eq": u"=",
@@ -23,7 +23,7 @@ class DBParser(object):
             u"$or": u"OR"
         }
 
-        self._headers = headers
+        self._columns = columns
         self._referenced = referenced
         self._table = table
 
@@ -53,6 +53,7 @@ class DBParser(object):
 
         return decomposed
 
+
     def rows_to_json(self, table, headers, rows):
 
         decomposed_headers = self.get_table_column_from_header(headers)
@@ -61,15 +62,16 @@ class DBParser(object):
             item = {}
             for index, cell in enumerate(row):
                 cell = self.python_type_to_json(cell)
+                j_field = self.headers_to_json(decomposed_headers[index])
                 if table == decomposed_headers[index][0]:
-                    item[decomposed_headers[index][1]] = cell
+                    item[j_field[1]] = cell
                 else:
-                    self.json_put(item, decomposed_headers[index][0] + u"." + decomposed_headers[index][1], cell)
+                    self.json_put(item, j_field[0] + u"." + j_field[1], cell)
 
             items.append(item)
         return items
 
-    def formatted_header_to_json(self, headers):
+    def headers_to_json(self, headers):
         formated_headers = []
         for header in headers:
             while header.find(u"_") != -1:
@@ -77,9 +79,10 @@ class DBParser(object):
                 header = header[:found] + header[found+1].upper() + header[found+2:]
 
             formated_headers.append(header)
+
         return formated_headers
 
-    def json_to_formatted_header(self, json_field):
+    def json_to_header(self, json_field):
         def insert_underscore(input):
             indexes = [i for i, ltr in enumerate(input) if ltr.isupper()]
             indexes.reverse()
@@ -93,17 +96,22 @@ class DBParser(object):
         # Reference field
         else:
             table, field = tuple(json_field.split(u"."))
+
+            for ref in self._referenced:
+                if ref[2] == table and ref[3] == field:
+                    table, field = ref[0], ref[1]
+                    break
+
             return u"`" + insert_underscore(table) + u"`.`" + insert_underscore(field) + u"`"
 
     def is_field(self, key):
-        db_field = self.json_to_formatted_header(key)
-        if db_field in self._headers:
+        db_field = self.json_to_header(key)
+        if db_field in [column[0] for column in self._columns]:
             return True
         return False
 
     def parse_filters(self, filters, operator=u"AND", parent=None):
-
-        filters = filters or []
+        filters = filters or {}
 
         if type(filters) is not list:
             filters = [filters]
@@ -112,12 +120,13 @@ class DBParser(object):
             u"statements": [],
             u"values": []
         }
+
         for filter in filters:
             for key in filter:
                 # If key is an operator
                 if self.is_field(key):
 
-                    db_field = self.json_to_formatted_header(key)
+                    db_field = self.json_to_header(key)
 
                     if type(filter[key]) in [unicode, str, int, float]:
 
@@ -132,7 +141,7 @@ class DBParser(object):
 
                 elif key in self._OPERATORS and parent is not None:
 
-                    db_field = self.json_to_formatted_header(parent)
+                    db_field = self.json_to_header(parent)
                     where[u"statements"].append(db_field + u" " + self._OPERATORS[key] + u" %s")
                     where[u"values"].append(filter[key])
 
@@ -143,8 +152,19 @@ class DBParser(object):
                     where[u"values"] += ret[u"values"]
 
         where[u"statements"] = (u" " + operator + u" ").join(where[u"statements"])
-        print(where)
         return where
 
+    def parse_update(self, data):
+        update = {
+            u"statements": [],
+            u"values": []
+        }
 
+        if u"$set" in data:
+            db_fields, values = zip(*[(self.json_to_header(field), data[u"$set"][field]) for field in data[u"$set"]])
+            update[u"statements"] += [(u"SET " + db_field + u" = %s") for db_field in db_fields]
+            update[u"values"] += values
+
+        update[u"statements"] = u", ".join(update[u"statements"])
+        return update
 

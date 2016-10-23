@@ -47,7 +47,7 @@ class DBConnection(object):
             for constraint in cursor.fetchall()
         ]
 
-    def get_headers(self, table):
+    def get_columns(self, table):
 
         referenced = self.get_referenced(table)
         cursor = self._db.cursor()
@@ -62,19 +62,20 @@ class DBConnection(object):
         if len(referenced) > 0:
             header_to_ignore, foreign_tables = zip(*[(field[1], field[2]) for field in referenced])
 
-        headers = [
-            u"`" + table + u"`.`" + row[0] + u"`"
+        columns = [
+            ((u"`" + table + u"`.`" + row[0] + u"`"), row[1])
             for row in cursor.fetchall()
             if row[0] not in header_to_ignore
         ]
 
         for foreign_table in foreign_tables:
-            headers += self.get_headers(foreign_table)
-        return headers
+            columns += self.get_columns(foreign_table)
+
+        return columns
 
     def select(self, table, where=None):
         referenced = self.get_referenced(table)
-        headers = self.get_headers(table)
+        headers = [column[0] for column in self.get_columns(table)]
 
         joins = [
             (u"JOIN " + ref[2] + u" ON `" + ref[0] + u"`.`" + ref[1] + u"` = `" + ref[2] + u"`.`" + ref[3]) + u"`"
@@ -92,3 +93,20 @@ class DBConnection(object):
         cursor.execute(query, where[u'values'])
 
         return headers, cursor.fetchall()
+
+    def update(self, table, update, where):
+
+        if where[u"statements"] != u"":
+            where[u"statements"] = u"WHERE " + where[u"statements"]
+
+        query = u"""
+        UPDATE """ + table + u""" """ + update[u"statements"] + where[u"statements"]
+
+        cursor = self._db.cursor()
+
+        cursor.execute(u"SELECT COUNT(*) FROM " + table + u" " + where[u"statements"], where[u"values"])
+        count = cursor.fetchall()[0][0]
+
+        cursor.execute(query, update[u"values"] + where[u"values"])
+
+        return count

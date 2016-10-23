@@ -13,26 +13,27 @@ def mock_referenced():
 
 
 @pytest.fixture(scope=u"function")
-def mock_headers():
+def mock_columns():
     return [
-        u'`hour`.`id`',
-        u'`hour`.`issue`',
-        u'`hour`.`started_at`',
-        u'`hour`.`minutes`',
-        u'`hour`.`comments`',
-        u'`project`.`id`',
-        u'`project`.`name`',
-        u'`user`.`id`',
-        u'`user`.`email`',
-        u'`user`.`name`'
+        (u'`hour`.`id`', u'int(11)'),
+        (u'`hour`.`issue`', u'varchar(45)'),
+        (u'`hour`.`started_at`', u'datetime'),
+        (u'`hour`.`minutes`', u'int(11)'),
+        (u'`hour`.`comments`', u'varchar(255)'),
+        (u'`project`.`id`', u'int(11)'),
+        (u'`project`.`name`', u'varchar(45)'),
+        (u'`user`.`id`', u'int(11)'),
+        (u'`user`.`email`', u'varchar(255)'),
+        (u'`user`.`name`', u'varchar(255)')
     ]
 
 
+
 @pytest.fixture(scope=u"function")
-def db_parser(mock_headers, mock_referenced):
+def db_parser(mock_columns, mock_referenced):
     db_parser = DBParser(
         table=u"hour",
-        headers=mock_headers,
+        columns=mock_columns,
         referenced=mock_referenced
     )
 
@@ -113,11 +114,37 @@ def test_is_field(db_parser):
 
 def test_get_json_for_formatted_header(db_parser):
 
-    ret = db_parser.json_to_formatted_header(u"issue")
+    ret = db_parser.json_to_header(u"issue")
     assert ret == u"`hour`.`issue`"
 
-    ret = db_parser.json_to_formatted_header(u"user.email")
+    ret = db_parser.json_to_header(u"user.email")
     assert ret == u"`user`.`email`"
 
-    ret = db_parser.json_to_formatted_header(u"startedAt")
+    ret = db_parser.json_to_header(u"startedAt")
     assert ret == u"`hour`.`started_at`"
+
+
+def test_parse_update(db_parser):
+
+    ret = db_parser.parse_update({
+        u"$set": {
+            u"comment": u"updated comment",
+            u"issue": u"updated issue"
+        }
+    })
+
+    assert ret[u"statements"] == u"SET `hour`.`comment` = %s, SET `hour`.`issue` = %s"
+    assert ret[u"values"][0] == u"updated comment"
+    assert ret[u"values"][1] == u"updated issue"
+
+    ret = db_parser.parse_update({
+        u"$set": {
+            u"user.id": 1,
+            u"project.id": 1
+        }
+    })
+
+    assert ret[u"statements"] == u"SET `hour`.`user_id` = %s, SET `hour`.`project_id` = %s"
+    assert ret[u"values"][0] == 1
+    assert ret[u"values"][1] == 1
+

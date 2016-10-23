@@ -21,7 +21,7 @@ db_flask_api = DBFlaskAPI(
 app = Flask(__name__)
 
 
-@app.route('/api/db/<string:table>')
+@app.route('/api/db/<string:table>', methods=[u"POST", u"PUT", u"DELETE", u"GET"])
 def hour(table):
     return db_flask_api.handle_request(request, table=table)
 
