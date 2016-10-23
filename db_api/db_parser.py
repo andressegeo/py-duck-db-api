@@ -162,10 +162,14 @@ class DBParser(object):
 
         if u"$set" in data:
             db_fields, values = zip(*[(self.json_to_header(field), data[u"$set"][field]) for field in data[u"$set"]])
-            update[u"statements"] += [(u"SET " + db_field + u" = %s") for db_field in db_fields]
+            update[u"statements"] += [(db_field + u" = %s") for db_field in db_fields]
             update[u"values"] += values
 
         update[u"statements"] = u", ".join(update[u"statements"])
+
+        if update[u"statements"] != u"":
+            update[u"statements"] = u"SET " + update[u"statements"]
+
         return update
 
     def to_one_level_json(self, obj, parent=u""):

@@ -133,7 +133,7 @@ def test_parse_update(db_parser):
         }
     })
 
-    assert ret[u"statements"] == u"SET `hour`.`comment` = %s, SET `hour`.`issue` = %s"
+    assert ret[u"statements"] == u"SET `hour`.`comment` = %s, `hour`.`issue` = %s"
     assert ret[u"values"][0] == u"updated comment"
     assert ret[u"values"][1] == u"updated issue"
 
@@ -144,7 +144,7 @@ def test_parse_update(db_parser):
         }
     })
 
-    assert ret[u"statements"] == u"SET `hour`.`user_id` = %s, SET `hour`.`project_id` = %s"
+    assert ret[u"statements"] == u"SET `hour`.`user_id` = %s, `hour`.`project_id` = %s"
     assert ret[u"values"][0] == 1
     assert ret[u"values"][1] == 1
 

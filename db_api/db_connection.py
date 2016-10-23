@@ -101,8 +101,7 @@ class DBConnection(object):
         if where[u"statements"] != u"":
             where[u"statements"] = u"WHERE " + where[u"statements"]
 
-        query = u"""
-        UPDATE """ + table + u""" """ + update[u"statements"] + where[u"statements"]
+        query = u"""UPDATE """ + table + u""" """ + update[u"statements"] + where[u"statements"]
 
         cursor = self._db.cursor()
 
@@ -111,7 +110,7 @@ class DBConnection(object):
 
         cursor.execute(query, update[u"values"] + where[u"values"])
         cursor.connection.commit()
-        
+
         return count
 
     def delete(self, table, where):
@@ -126,6 +125,7 @@ class DBConnection(object):
 
         cursor.execute(u"SELECT COUNT(*) FROM " + table + u" " + where[u"statements"], where[u"values"])
         count = cursor.fetchall()[0][0]
+
 
         cursor.execute(query, where[u"values"])
 
