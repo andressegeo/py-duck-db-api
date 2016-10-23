@@ -91,6 +91,7 @@ class DBConnection(object):
         if where is not None and where[u"statements"] != u"":
             query = query + u" WHERE " + where[u"statements"]
 
+        print(query)
         cursor = self._db.cursor()
         cursor.execute(query, where[u'values'])
 
