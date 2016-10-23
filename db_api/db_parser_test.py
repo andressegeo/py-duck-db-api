@@ -170,8 +170,9 @@ def test_parse_insert(db_parser):
     assert ret[u"statements"] == u" ".join([
         u"INSERT INTO",
         u"`hour`(`hour`.`project_id`, `hour`.`started_at`, `hour`.`user_id`, `hour`.`minutes`, `hour`.`issue`, `hour`.`comments`)",
-        u"VALUES(%s, %s, %s, %s, %s, %s)"
+        u"VALUES(%s, FROM_UNIXTIME(%s), %s, %s, %s, %s)"
     ])
+
     assert ret[u"values"][0] == 1
     assert ret[u"values"][4] == u"test"
     assert ret[u"values"][5] == u"test"
@@ -195,3 +196,33 @@ def test_to_one_level_json(db_parser):
     assert u"issue" in transformed
     assert transformed[u"user.email"] == u"klambert@gpartner.eu"
     assert transformed[u"project.id"] == 1
+
+
+def test_get_wrapped_values(db_parser):
+    wrapped_values = db_parser.get_wrapped_values(headers=[
+            u"`hour`.`issue`",
+            u"`hour`.`id`",
+            u"`hour`.`started_at`"
+        ],
+        values=[
+            u"test",
+            u"test",
+            1234
+        ]
+    )
+
+    assert wrapped_values == u"%s, %s, FROM_UNIXTIME(%s)"
+
+    wrapped_values = db_parser.get_wrapped_values(headers=[
+        u"`hour`.`issue`",
+        u"`hour`.`id`",
+        u"`hour`.`started_at`"
+    ],
+        values=[
+            u"test",
+            u"test",
+            u"2016-10-09"
+        ]
+    )
+
+    assert wrapped_values == u"%s, %s, %s"

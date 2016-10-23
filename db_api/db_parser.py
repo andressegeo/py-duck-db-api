@@ -181,6 +181,32 @@ class DBParser(object):
 
         return output
 
+    def get_wrapped_values(self, headers, values):
+        without_referenced = []
+
+        for header in headers:
+            found = False
+            for reference in self._referenced:
+                if (u"`" + reference[0] + u"`.`" + reference[1] + u"`") == header:
+                    without_referenced.append((u"`" + reference[2] + u"`.`" + reference[3] + u"`"))
+                    found = True
+                    break
+            if not found:
+                without_referenced.append(header)
+
+        output = []
+
+        for index, field in enumerate(without_referenced):
+            for column in self._columns:
+                if field == column[0]:
+                    if u"datetime" in column[1] and type(values[index]) in [int, float]:
+                        output.append(u"FROM_UNIXTIME(%s)")
+                    else:
+                        output.append(u"%s")
+                    break
+
+        return u", ".join(output)
+
     def parse_insert(self, data):
         insert = {
             u"statements": u"INSERT INTO `" + self._table + u"`(#fields) VALUES(#values)",
@@ -195,8 +221,9 @@ class DBParser(object):
             if self._table in self.json_to_header(field)
         ])
 
+
         insert[u"statements"] = insert[u"statements"].replace(u"#fields", u", ".join(list(db_fields)))
-        insert[u"statements"] = insert[u"statements"].replace(u"#values", u", ".join([u"%s"] * len(db_fields)))
+        insert[u"statements"] = insert[u"statements"].replace(u"#values", self.get_wrapped_values(db_fields, insert[u"values"]))
 
 
         return insert
