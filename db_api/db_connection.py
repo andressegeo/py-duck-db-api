@@ -110,7 +110,8 @@ class DBConnection(object):
         count = cursor.fetchall()[0][0]
 
         cursor.execute(query, update[u"values"] + where[u"values"])
-
+        cursor.connection.commit()
+        
         return count
 
     def delete(self, table, where):
@@ -128,6 +129,7 @@ class DBConnection(object):
 
         cursor.execute(query, where[u"values"])
 
+        cursor.connection.commit()
         return count
 
     def insert(self, insert):
@@ -135,6 +137,6 @@ class DBConnection(object):
         cursor = self._db.cursor()
 
         cursor.execute(insert[u'statements'], insert[u"values"])
-        print("insert")
+
         cursor.connection.commit()
         return cursor.lastrowid
