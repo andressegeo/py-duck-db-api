@@ -168,3 +168,36 @@ class DBParser(object):
         update[u"statements"] = u", ".join(update[u"statements"])
         return update
 
+    def to_one_level_json(self, obj, parent=u""):
+        output = {}
+        if parent != u"":
+            parent += u"."
+
+        for key in obj:
+            if type(obj[key]) is dict:
+                output.update(self.to_one_level_json(obj[key], parent=key))
+            else:
+                output[(parent + key)] = obj[key]
+
+        return output
+
+    def parse_insert(self, data):
+        insert = {
+            u"statements": u"INSERT INTO `" + self._table + u"`(#fields) VALUES(#values)",
+            u"values": []
+        }
+
+        one_level_data = self.to_one_level_json(data)
+
+        db_fields, insert[u"values"] = zip(*[
+            (self.json_to_header(field), one_level_data[field])
+            for field in one_level_data
+            if self._table in self.json_to_header(field)
+        ])
+
+        insert[u"statements"] = insert[u"statements"].replace(u"#fields", u", ".join(list(db_fields)))
+        insert[u"statements"] = insert[u"statements"].replace(u"#values", u", ".join([u"%s"] * len(db_fields)))
+
+
+        return insert
+

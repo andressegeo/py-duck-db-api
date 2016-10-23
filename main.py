@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 
-
 import MySQLdb
-import json
-
 from flask import Flask, request
 from db_api.db_flask_api import DBFlaskAPI
 from db_api.db_parser import DBParser

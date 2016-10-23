@@ -14,6 +14,8 @@ class DBConnection(object):
             database,
             host=u"127.0.0.1"):
 
+        self._db_api_def = db_api_def
+
         self._db = db_api_def.connect(
             host=host,
             user=user,
@@ -110,3 +112,27 @@ class DBConnection(object):
         cursor.execute(query, update[u"values"] + where[u"values"])
 
         return count
+
+    def delete(self, table, where):
+
+        if where[u"statements"] != u"":
+            where[u"statements"] = u"WHERE " + where[u"statements"]
+
+        query = u"""
+        DELETE FROM """ + table + u""" """ + where[u"statements"]
+
+        cursor = self._db.cursor()
+
+        cursor.execute(u"SELECT COUNT(*) FROM " + table + u" " + where[u"statements"], where[u"values"])
+        count = cursor.fetchall()[0][0]
+
+        cursor.execute(query, where[u"values"])
+
+        return count
+
+    def insert(self, insert):
+
+        cursor = self._db.cursor()
+
+        cursor.execute(insert[u'statements'], insert[u"values"])
+        return cursor.lastrowid

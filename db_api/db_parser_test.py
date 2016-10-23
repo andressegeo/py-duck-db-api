@@ -1,4 +1,4 @@
-
+# -*- coding: utf-8 -*-
 
 import pytest
 from db_parser import DBParser
@@ -148,3 +148,50 @@ def test_parse_update(db_parser):
     assert ret[u"values"][0] == 1
     assert ret[u"values"][1] == 1
 
+
+def test_parse_insert(db_parser):
+
+    ret = db_parser.parse_insert(data={
+        u"comments": u"test",
+        u"issue": u"test",
+        u"minutes": 5,
+        u"project": {
+            u"id": 1,
+            u"name": u"Interne"
+        },
+        u"startedAt": 1476057600,
+        u"user": {
+            u"email": u"klambert@gpartner.eu",
+            u"id": 1,
+            u"name": u"Kévin LAMBERT"
+        }
+    })
+
+    assert ret[u"statements"] == u" ".join([
+        u"INSERT INTO",
+        u"`hour`(`hour`.`project_id`, `hour`.`started_at`, `hour`.`user_id`, `hour`.`minutes`, `hour`.`issue`, `hour`.`comments`)",
+        u"VALUES(%s, %s, %s, %s, %s, %s)"
+    ])
+    assert ret[u"values"][0] == 1
+    assert ret[u"values"][4] == u"test"
+    assert ret[u"values"][5] == u"test"
+
+
+def test_to_one_level_json(db_parser):
+    transformed = db_parser.to_one_level_json(obj={
+        u"issue": u"test issue",
+        u"project": {
+            u"id": 1,
+            u"name": u"Test"
+        },
+        u"user": {
+            u"id": 1,
+            u"email": u"klambert@gpartner.eu"
+        }
+    })
+
+    assert u"project.id" in transformed
+    assert u"user.email" in transformed
+    assert u"issue" in transformed
+    assert transformed[u"user.email"] == u"klambert@gpartner.eu"
+    assert transformed[u"project.id"] == 1

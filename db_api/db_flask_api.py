@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from db_api.db_connection import DBConnection
+
 from flask import jsonify
 import json
 
@@ -15,7 +15,7 @@ class DBFlaskAPI(object):
             db_connection_def,
             db_parser_def
     ):
-
+        self._db_api_def = db_api_def
         self.db_connection = db_connection_def(
             db_api_def=db_api_def,
             user=db_user,
@@ -28,6 +28,7 @@ class DBFlaskAPI(object):
     def handle_request(self, request, table):
         result = {}
 
+        code = 200
         db_parser = self.__db_parser_def(
             table=table,
             columns=self.db_connection.get_columns(table),
@@ -45,6 +46,7 @@ class DBFlaskAPI(object):
             data = json.loads(data, encoding=u"utf-8")
 
         if request.method == u"GET":
+
             headers, rows = self.db_connection.select(
                 table=table,
                 where=db_parser.parse_filters(filters)
@@ -55,6 +57,7 @@ class DBFlaskAPI(object):
             }
 
         elif request.method == u"PUT":
+
             count = self.db_connection.update(
                 table=table,
                 update=db_parser.parse_update(
@@ -67,4 +70,33 @@ class DBFlaskAPI(object):
                 u"count": count
             }
 
-        return jsonify(result)
+        elif request.method == u"DELETE":
+
+            count = self.db_connection.delete(
+                table=table,
+                where=db_parser.parse_filters(filters)
+            )
+
+            result = {
+                u"count": count
+            }
+
+        elif request.method == u"POST":
+
+            try:
+                count = self.db_connection.insert(
+                    insert=db_parser.parse_insert(data=data)
+                )
+                result = {
+                    u"id": count
+                }
+
+                code = 201
+            except self._db_api_def.OperationalError as e:
+                result = {
+                    u"message" : unicode(e[1])
+                }
+
+                code = 422
+
+        return jsonify(result), code
