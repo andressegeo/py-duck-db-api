@@ -8,13 +8,13 @@ class DBConnection(object):
 
     def __init__(
             self,
-            db_api,
+            db_api_def,
             user,
             password,
             database,
             host=u"127.0.0.1"):
 
-        self._db = db_api.connect(
+        self._db = db_api_def.connect(
             host=host,
             user=user,
             passwd=password,
@@ -50,8 +50,6 @@ class DBConnection(object):
     def get_headers(self, table):
 
         referenced = self.get_referenced(table)
-        print(u"referenced")
-        print(referenced)
         cursor = self._db.cursor()
 
         query = u"""
@@ -72,8 +70,6 @@ class DBConnection(object):
 
         for foreign_table in foreign_tables:
             headers += self.get_headers(foreign_table)
-        print(u"headers")
-        print(headers)
         return headers
 
     def select(self, table, where=None):
@@ -89,7 +85,10 @@ class DBConnection(object):
         SELECT """ + u", ".join(headers) + u"""
         FROM """ + table + u" " + (u" ".join(joins))
 
+        if where is not None and where[u"statements"] != u"":
+            query = query + u" WHERE " + where[u"statements"]
+
         cursor = self._db.cursor()
-        cursor.execute(query)
+        cursor.execute(query, where[u'values'])
 
         return headers, cursor.fetchall()
