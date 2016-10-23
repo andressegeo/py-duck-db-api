@@ -78,10 +78,12 @@ def test_parse_filters(db_parser):
             }, {
                 u"$and": [
                     {
-                        u"issue": u"val 2"
+                        u"startedAt": {
+                            u"$gte": 1477180920
+                        }
                     }, {
-                        u"issue": {
-                            u"$eq" : u"val 3"
+                        u"user.email": {
+                            u"$eq": u"klambert@gpartner.eu"
                         }
                     }
                 ]
@@ -89,10 +91,10 @@ def test_parse_filters(db_parser):
         ]
     })
 
-    assert ret[u"statements"] == u"(`hour`.`issue` = %s OR (`hour`.`issue` = %s AND `hour`.`issue` = %s))"
+    assert ret[u"statements"] == u"(`hour`.`issue` = %s OR (`hour`.`started_at` >= %s AND `user`.`email` = %s))"
     assert ret[u"values"][0] == u"val 1"
-    assert ret[u"values"][1] == u"val 2"
-    assert ret[u"values"][2] == u"val 3"
+    assert ret[u"values"][1] == 1477180920
+    assert ret[u"values"][2] == u"klambert@gpartner.eu"
 
 def test_is_field(db_parser):
 
