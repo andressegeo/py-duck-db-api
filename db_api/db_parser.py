@@ -188,8 +188,11 @@ class DBParser(object):
 
             for index, db_field in enumerate(db_fields):
                 if self._table in db_field:
-                    update[u"statements"] += [(db_field + u" = %s")]
+                    wrapped = self.get_wrapped_values([db_field], [values[index]])
+                    update[u"statements"] += [(db_field + u" = " + wrapped)]
                     update[u"values"].append(values[index])
+
+
 
         update[u"statements"] = u", ".join(update[u"statements"])
 
@@ -225,7 +228,6 @@ class DBParser(object):
                         output.append(u"%s")
 
                     break
-
         return u", ".join(output)
 
     def parse_insert(self, data):

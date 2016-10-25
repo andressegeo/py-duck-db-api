@@ -212,24 +212,24 @@ def test_parse_update(db_parser):
 
     ret = db_parser.parse_update({
         u"$set": {
-            u"comment": u"updated comment",
+            u"comments": u"updated comment",
             u"issue": u"updated issue"
         }
     })
 
-    assert ret[u"statements"] == u"SET `hour`.`comment` = %s, `hour`.`issue` = %s"
-    assert ret[u"values"][0] == u"updated comment"
-    assert ret[u"values"][1] == u"updated issue"
+    assert ret[u"statements"] == u"SET `hour`.`issue` = %s, `hour`.`comments` = %s"
+    assert ret[u"values"][1] == u"updated comment"
+    assert ret[u"values"][0] == u"updated issue"
 
     ret = db_parser.parse_update({
         u"$set": {
             u"user.id": 1,
             u"project.id": 1,
-            u"project.name" : "TEST"
+            u"startedAt" : 1477434540
         }
     })
 
-    assert ret[u"statements"] == u"SET `hour`.`user_id` = %s, `hour`.`project_id` = %s"
+    assert ret[u"statements"] == u"SET `hour`.`user_id` = %s, `hour`.`project_id` = %s, `hour`.`started_at` = FROM_UNIXTIME(%s)"
     assert ret[u"values"][0] == 1
     assert ret[u"values"][1] == 1
 
@@ -241,10 +241,11 @@ def test_parse_update(db_parser):
             },
             u"project": {
                 u"id": 1
-            }
+            },
+
         }
     })
-    
+
     assert ret[u"statements"] == u"SET `hour`.`user_id` = %s, `hour`.`project_id` = %s"
     assert ret[u"values"][0] == 1
     assert ret[u"values"][1] == 1
