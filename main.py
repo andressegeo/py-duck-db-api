@@ -25,10 +25,10 @@ def hour(table):
 
 app.run(debug=True)
 
-# db_connection = DBConnection(
-#     db_api_def=MySQLdb,
-#     user=u"root",
-#     password=u"localroot1234",
-#     database=u"hours_count"
-# )
-# print(json.dumps(db_connection.get_columns("hour"), indent=4))
+db_connection = DBConnection(
+    db_api_def=MySQLdb,
+    user=u"root",
+    password=u"localroot1234",
+    database=u"hours_count"
+)
+print(json.dumps(db_connection.get_columns("hour"), indent=4))

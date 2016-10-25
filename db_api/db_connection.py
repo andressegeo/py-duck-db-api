@@ -44,7 +44,7 @@ class DBConnection(object):
 
         cursor.execute(query, (self._database, table))
 
-        return [
+        referenced = [
             {
                 u"table_name": constraint[0],
                 u"column_name": constraint[1],
@@ -53,6 +53,11 @@ class DBConnection(object):
             }
             for constraint in cursor.fetchall()
         ]
+
+        for ref in referenced:
+            referenced += self.get_referenced(ref[u"referenced_table_name"])
+
+        return referenced
 
     def get_columns(self, table):
 
@@ -85,7 +90,9 @@ class DBConnection(object):
         return columns
 
     def select(self, table, where=None):
+
         referenced = self.get_referenced(table)
+        print(referenced)
         headers = [
             u"`" + col[u"table_name"] + u"`.`" + col[u"column_name"] + u"`"
             for col in self.get_columns(table)
@@ -100,7 +107,7 @@ class DBConnection(object):
                 + u"`.`" + ref[u"referenced_column_name"] + u"`"
             )
             for ref in referenced
-            if (ref[u"table_name"] == table and u"referenced_table_name" in ref)
+            if u"referenced_table_name" in ref
         ]
 
         query = u"""
@@ -110,7 +117,7 @@ class DBConnection(object):
         if where is not None and where[u"statements"] != u"":
             query = query + u" WHERE " + where[u"statements"]
 
-
+        print(query)
         cursor = self._db.cursor()
         cursor.execute(query, where[u'values'])
 
