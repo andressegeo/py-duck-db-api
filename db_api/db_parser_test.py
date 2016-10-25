@@ -92,10 +92,19 @@ def test_parse_filters(db_parser):
         ]
     })
 
-    assert ret[u"statements"] == u"(`hour`.`issue` = %s OR (`hour`.`started_at` >= %s AND `user`.`email` = %s))"
+    assert ret[u"statements"] == u"(`hour`.`issue` = %s OR (`hour`.`started_at` >= FROM_UNIXTIME(%s) AND `user`.`email` = %s))"
     assert ret[u"values"][0] == u"val 1"
     assert ret[u"values"][1] == 1477180920
     assert ret[u"values"][2] == u"klambert@gpartner.eu"
+
+
+    ret = db_parser.parse_filters({
+        u"user.id" : 1
+    })
+
+    assert ret[u"statements"] == u"`user`.`id` = %s"
+    assert ret[u"values"][0] == 1
+
 
 def test_is_field(db_parser):
 

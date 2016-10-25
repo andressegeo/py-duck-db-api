@@ -82,7 +82,7 @@ class DBParser(object):
 
         return formated_headers
 
-    def json_to_header(self, json_field):
+    def json_to_header(self, json_field, use_referenced=False):
         def insert_underscore(input):
             indexes = [i for i, ltr in enumerate(input) if ltr.isupper()]
             indexes.reverse()
@@ -97,10 +97,12 @@ class DBParser(object):
         else:
             table, field = tuple(json_field.split(u"."))
 
-            for ref in self._referenced:
-                if ref[2] == table and ref[3] == field:
-                    table, field = ref[0], ref[1]
-                    break
+
+            if use_referenced:
+                for ref in self._referenced:
+                    if ref[2] == table and ref[3] == field:
+                        table, field = ref[0], ref[1]
+                        break
 
             return u"`" + insert_underscore(table) + u"`.`" + insert_underscore(field) + u"`"
 
@@ -163,7 +165,7 @@ class DBParser(object):
         }
 
         if u"$set" in data:
-            db_fields, values = zip(*[(self.json_to_header(field), data[u"$set"][field]) for field in data[u"$set"]])
+            db_fields, values = zip(*[(self.json_to_header(field, use_referenced=True), data[u"$set"][field]) for field in data[u"$set"]])
             update[u"statements"] += [(db_field + u" = %s") for db_field in db_fields]
             update[u"values"] += values
 
@@ -222,9 +224,9 @@ class DBParser(object):
         one_level_data = self.to_one_level_json(data)
 
         db_fields, insert[u"values"] = zip(*[
-            (self.json_to_header(field), one_level_data[field])
+            (self.json_to_header(field, use_referenced=True), one_level_data[field])
             for field in one_level_data
-            if self._table in self.json_to_header(field)
+            if self._table in self.json_to_header(field, use_referenced=True)
         ])
 
 
@@ -233,4 +235,3 @@ class DBParser(object):
 
 
         return insert
-
