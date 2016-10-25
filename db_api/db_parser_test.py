@@ -4,41 +4,117 @@ import pytest
 from db_parser import DBParser
 
 
-@pytest.fixture(scope=u"function")
-def mock_referenced():
-    return [
-        (u'hour', u'project_id', u'project', u'id'),
-        (u'hour', u'user_id', u'user', u'id')
-    ]
-
 
 @pytest.fixture(scope=u"function")
 def mock_columns():
     return [
-        (u'`hour`.`id`', u'int(11)'),
-        (u'`hour`.`issue`', u'varchar(45)'),
-        (u'`hour`.`started_at`', u'datetime'),
-        (u'`hour`.`minutes`', u'int(11)'),
-        (u'`hour`.`comments`', u'varchar(255)'),
-        (u'`project`.`id`', u'int(11)'),
-        (u'`project`.`name`', u'varchar(45)'),
-        (u'`user`.`id`', u'int(11)'),
-        (u'`user`.`email`', u'varchar(255)'),
-        (u'`user`.`name`', u'varchar(255)')
+        {
+            "type": "int(11)",
+            "table_name": "hour",
+            "column_name": "id"
+        },
+        {
+            "type": "varchar(45)",
+            "table_name": "hour",
+            "column_name": "issue"
+        },
+        {
+            "type": "datetime",
+            "table_name": "hour",
+            "column_name": "started_at"
+        },
+        {
+            "type": "int(11)",
+            "table_name": "hour",
+            "column_name": "minutes"
+        },
+        {
+            "type": "varchar(255)",
+            "table_name": "hour",
+            "column_name": "comments"
+        },
+        {
+            "type": "int(11)",
+            "table_name": "project",
+            "column_name": "id"
+        },
+        {
+            "type": "varchar(45)",
+            "table_name": "project",
+            "column_name": "name"
+        },
+        {
+            "table_name": "hour",
+            "referenced_table_name": "project",
+            "type": "int(11)",
+            "referenced_column_name": "id",
+            "column_name": "project_id"
+        },
+        {
+            "type": "int(11)",
+            "table_name": "user",
+            "column_name": "id"
+        },
+        {
+            "type": "varchar(255)",
+            "table_name": "user",
+            "column_name": "email"
+        },
+        {
+            "type": "varchar(255)",
+            "table_name": "user",
+            "column_name": "name"
+        },
+        {
+            "table_name": "hour",
+            "referenced_table_name": "user",
+            "type": "int(11)",
+            "referenced_column_name": "id",
+            "column_name": "user_id"
+        }
     ]
 
 
 
+
+
 @pytest.fixture(scope=u"function")
-def db_parser(mock_columns, mock_referenced):
+def db_parser(mock_columns):
     db_parser = DBParser(
         table=u"hour",
-        columns=mock_columns,
-        referenced=mock_referenced
+        columns=mock_columns
     )
 
     return db_parser
 
+def test_get_wrapped_values(db_parser):
+    wrapped_values = db_parser.get_wrapped_values(headers=[
+            u"`hour`.`issue`",
+            u"`hour`.`id`",
+            u"`hour`.`started_at`"
+        ],
+        values=[
+            u"test",
+            u"test",
+            1234
+        ]
+    )
+    assert wrapped_values == u"%s, %s, FROM_UNIXTIME(%s)"
+
+
+    wrapped_values = db_parser.get_wrapped_values(headers=[
+        u"`hour`.`issue`",
+        u"`hour`.`id`",
+        u"`hour`.`started_at`"
+    ],
+        values=[
+            u"test",
+            u"test",
+            u"2016-10-09"
+        ]
+    )
+
+    assert wrapped_values == u"%s, %s, %s"
 
 def test_parse_filters(db_parser):
     ret = db_parser.parse_filters({
@@ -91,7 +167,6 @@ def test_parse_filters(db_parser):
             }
         ]
     })
-
     assert ret[u"statements"] == u"(`hour`.`issue` = %s OR (`hour`.`started_at` >= FROM_UNIXTIME(%s) AND `user`.`email` = %s))"
     assert ret[u"values"][0] == u"val 1"
     assert ret[u"values"][1] == 1477180920
@@ -149,7 +224,8 @@ def test_parse_update(db_parser):
     ret = db_parser.parse_update({
         u"$set": {
             u"user.id": 1,
-            u"project.id": 1
+            u"project.id": 1,
+            u"project.name" : "TEST"
         }
     })
 
@@ -160,15 +236,15 @@ def test_parse_update(db_parser):
     ret = db_parser.parse_update({
         u"$set": {
             u"user": {
-                u"id": 1
+                u"id": 1,
+                u"name" : "Kevin LAMBERT"
             },
             u"project": {
                 u"id": 1
             }
         }
     })
-    print("lalallalalala")
-    print(ret)
+    
     assert ret[u"statements"] == u"SET `hour`.`user_id` = %s, `hour`.`project_id` = %s"
     assert ret[u"values"][0] == 1
     assert ret[u"values"][1] == 1
@@ -220,33 +296,3 @@ def test_to_one_level_json(db_parser):
     assert u"issue" in transformed
     assert transformed[u"user.email"] == u"klambert@gpartner.eu"
     assert transformed[u"project.id"] == 1
-
-
-def test_get_wrapped_values(db_parser):
-    wrapped_values = db_parser.get_wrapped_values(headers=[
-            u"`hour`.`issue`",
-            u"`hour`.`id`",
-            u"`hour`.`started_at`"
-        ],
-        values=[
-            u"test",
-            u"test",
-            1234
-        ]
-    )
-
-    assert wrapped_values == u"%s, %s, FROM_UNIXTIME(%s)"
-
-    wrapped_values = db_parser.get_wrapped_values(headers=[
-        u"`hour`.`issue`",
-        u"`hour`.`id`",
-        u"`hour`.`started_at`"
-    ],
-        values=[
-            u"test",
-            u"test",
-            u"2016-10-09"
-        ]
-    )
-
-    assert wrapped_values == u"%s, %s, %s"

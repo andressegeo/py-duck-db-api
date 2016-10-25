@@ -31,8 +31,7 @@ class DBFlaskAPI(object):
         code = 200
         db_parser = self.__db_parser_def(
             table=table,
-            columns=self.db_connection.get_columns(table),
-            referenced=self.db_connection.get_referenced(table)
+            columns=self.db_connection.get_columns(table)
         )
 
         filters = request.args.get(u'filters')

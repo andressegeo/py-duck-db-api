@@ -5,6 +5,7 @@ from flask import Flask, request
 from db_api.db_flask_api import DBFlaskAPI
 from db_api.db_parser import DBParser
 from db_api.db_connection import DBConnection
+import json
 
 db_flask_api = DBFlaskAPI(
     db_api_def=MySQLdb,
@@ -24,8 +25,10 @@ def hour(table):
 
 app.run(debug=True)
 
-
-
-
-
-
+# db_connection = DBConnection(
+#     db_api_def=MySQLdb,
+#     user=u"root",
+#     password=u"localroot1234",
+#     database=u"hours_count"
+# )
+# print(json.dumps(db_connection.get_columns("hour"), indent=4))

@@ -7,7 +7,7 @@ import re
 
 class DBParser(object):
 
-    def __init__(self, table, columns, referenced):
+    def __init__(self, table, columns):
 
         self._OPERATORS = {
             u"$eq": u"=",
@@ -24,7 +24,6 @@ class DBParser(object):
         }
 
         self._columns = columns
-        self._referenced = referenced
         self._table = table
 
     def json_put(self, item, path, value):
@@ -47,16 +46,13 @@ class DBParser(object):
         else:
             return val
 
-    def get_table_column_from_header(self, headers):
-        decomposed = [(re.search(u"`(\S+)+`\.*`(\S+)+`", header)).groups() for header in headers]
-
-
-        return decomposed
-
-
     def rows_to_json(self, table, headers, rows):
 
-        decomposed_headers = self.get_table_column_from_header(headers)
+        def get_table_column_from_header(headers):
+            decomposed = [(re.search(u"`(\S+)+`\.*`(\S+)+`", header)).groups() for header in headers]
+            return decomposed
+
+        decomposed_headers = get_table_column_from_header(headers)
         items = []
         for row in rows:
             item = {}
@@ -97,20 +93,34 @@ class DBParser(object):
         else:
             table, field = tuple(json_field.split(u"."))
 
-
             if use_referenced:
-                for ref in self._referenced:
-                    if ref[2] == table and ref[3] == field:
-                        table, field = ref[0], ref[1]
+                for ref in self.get_columns_with_reference():
+                    if (ref[u"referenced_table_name"] == table
+                        and ref[u"referenced_column_name"] == field):
+                        table, field = ref[u"table_name"], ref[u"column_name"]
                         break
 
             return u"`" + insert_underscore(table) + u"`.`" + insert_underscore(field) + u"`"
 
+    def get_columns_with_reference(self):
+        return [column for column in self._columns
+            if u"referenced_table_name" in column]
+
     def is_field(self, key):
         db_field = self.json_to_header(key)
-        if db_field in [column[0] for column in self._columns]:
-            return True
-        return False
+
+        valid_columns = []
+
+        for column in self._columns:
+            valid_columns.append(u"`" + column[u"table_name"]
+                + u"`.`" + column[u"column_name"] + u"`"
+            )
+            if u"referenced_table_name" in column:
+                valid_columns.append(u"`" + column[u"referenced_table_name"]
+                    + u"`.`" + column[u"referenced_column_name"] + u"`"
+                )
+
+        return db_field in valid_columns
 
     def parse_filters(self, filters, operator=u"AND", parent=None):
         filters = filters or {}
@@ -125,6 +135,7 @@ class DBParser(object):
 
         for filter in filters:
             for key in filter:
+
                 # If key is an operator
                 if self.is_field(key):
 
@@ -168,9 +179,17 @@ class DBParser(object):
 
         if u"$set" in data:
             data[u"$set"] = self.to_one_level_json(data[u"$set"])
-            db_fields, values = zip(*[(self.json_to_header(field, use_referenced=True), data[u"$set"][field]) for field in data[u"$set"]])
-            update[u"statements"] += [(db_field + u" = %s") for db_field in db_fields]
-            update[u"values"] += values
+            db_fields, values = zip(*[
+                (
+                    self.json_to_header(field, use_referenced=True),
+                    data[u"$set"][field]
+                ) for field in data[u"$set"]]
+            )
+
+            for index, db_field in enumerate(db_fields):
+                if self._table in db_field:
+                    update[u"statements"] += [(db_field + u" = %s")]
+                    update[u"values"].append(values[index])
 
         update[u"statements"] = u", ".join(update[u"statements"])
 
@@ -193,27 +212,18 @@ class DBParser(object):
         return output
 
     def get_wrapped_values(self, headers, values):
-        without_referenced = []
-
-        for header in headers:
-            found = False
-            for reference in self._referenced:
-                if (u"`" + reference[0] + u"`.`" + reference[1] + u"`") == header:
-                    without_referenced.append((u"`" + reference[2] + u"`.`" + reference[3] + u"`"))
-                    found = True
-                    break
-            if not found:
-                without_referenced.append(header)
 
         output = []
 
-        for index, field in enumerate(without_referenced):
+        for index, header in enumerate(headers):
             for column in self._columns:
-                if field == column[0]:
-                    if u"datetime" in column[1] and type(values[index]) in [int, float]:
+                if (u"`" + column[u"table_name"] + u"`.`" + column[u"column_name"] + u"`") == header:
+
+                    if u"datetime" in column[u"type"] and type(values[index]) in [int, float]:
                         output.append(u"FROM_UNIXTIME(%s)")
                     else:
                         output.append(u"%s")
+
                     break
 
         return u", ".join(output)

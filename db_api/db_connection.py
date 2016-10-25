@@ -45,7 +45,12 @@ class DBConnection(object):
         cursor.execute(query, (self._database, table))
 
         return [
-            (table, constraint[1], constraint[2], constraint[3])
+            {
+                u"table_name": constraint[0],
+                u"column_name": constraint[1],
+                u"referenced_table_name": constraint[2],
+                u"referenced_column_name": constraint[3]
+            }
             for constraint in cursor.fetchall()
         ]
 
@@ -60,28 +65,42 @@ class DBConnection(object):
 
         cursor.execute(query)
 
-        header_to_ignore, foreign_tables = [], []
-        if len(referenced) > 0:
-            header_to_ignore, foreign_tables = zip(*[(field[1], field[2]) for field in referenced])
-
-        columns = [
-            ((u"`" + table + u"`.`" + row[0] + u"`"), row[1])
-            for row in cursor.fetchall()
-            if row[0] not in header_to_ignore
-        ]
-
-        for foreign_table in foreign_tables:
-            columns += self.get_columns(foreign_table)
+        columns = []
+        # For each row
+        for row in cursor.fetchall():
+            column = {
+                u"table_name": table,
+                u"column_name": row[0],
+                u"type": row[1]
+            }
+            # If reference found, add it
+            for ref in referenced:
+                if (ref[u"table_name"] == column[u"table_name"]
+                    and ref[u"column_name"] == column[u"column_name"]):
+                    column.update(ref)
+                    columns += self.get_columns(ref[u"referenced_table_name"])
+                    break
+            columns.append(column)
 
         return columns
 
     def select(self, table, where=None):
         referenced = self.get_referenced(table)
-        headers = [column[0] for column in self.get_columns(table)]
+        headers = [
+            u"`" + col[u"table_name"] + u"`.`" + col[u"column_name"] + u"`"
+            for col in self.get_columns(table)
+        ]
 
         joins = [
-            (u"JOIN " + ref[2] + u" ON `" + ref[0] + u"`.`" + ref[1] + u"` = `" + ref[2] + u"`.`" + ref[3]) + u"`"
+            (
+                u"JOIN " + ref[u"referenced_table_name"] + u" ON `"
+                + ref[u"table_name"]
+                + u"`.`" + ref[u"column_name"] + u"` = `"
+                + ref[u"referenced_table_name"]
+                + u"`.`" + ref[u"referenced_column_name"] + u"`"
+            )
             for ref in referenced
+            if (ref[u"table_name"] == table and u"referenced_table_name" in ref)
         ]
 
         query = u"""
@@ -100,7 +119,7 @@ class DBConnection(object):
     def update(self, table, update, where):
 
         if where[u"statements"] != u"":
-            where[u"statements"] = u"WHERE " + where[u"statements"]
+            where[u"statements"] = u" WHERE " + where[u"statements"]
 
         query = u"""UPDATE """ + table + u""" """ + update[u"statements"] + where[u"statements"]
 
@@ -109,6 +128,7 @@ class DBConnection(object):
         cursor.execute(u"SELECT COUNT(*) FROM " + table + u" " + where[u"statements"], where[u"values"])
         count = cursor.fetchall()[0][0]
 
+        print(query)
         cursor.execute(query, update[u"values"] + where[u"values"])
         cursor.connection.commit()
 
