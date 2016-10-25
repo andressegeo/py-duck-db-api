@@ -157,6 +157,21 @@ def test_parse_update(db_parser):
     assert ret[u"values"][0] == 1
     assert ret[u"values"][1] == 1
 
+    ret = db_parser.parse_update({
+        u"$set": {
+            u"user": {
+                u"id": 1
+            },
+            u"project": {
+                u"id": 1
+            }
+        }
+    })
+    print("lalallalalala")
+    print(ret)
+    assert ret[u"statements"] == u"SET `hour`.`user_id` = %s, `hour`.`project_id` = %s"
+    assert ret[u"values"][0] == 1
+    assert ret[u"values"][1] == 1
 
 def test_parse_insert(db_parser):
 

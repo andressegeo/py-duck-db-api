@@ -164,7 +164,10 @@ class DBParser(object):
             u"values": []
         }
 
+
+
         if u"$set" in data:
+            data[u"$set"] = self.to_one_level_json(data[u"$set"])
             db_fields, values = zip(*[(self.json_to_header(field, use_referenced=True), data[u"$set"][field]) for field in data[u"$set"]])
             update[u"statements"] += [(db_field + u" = %s") for db_field in db_fields]
             update[u"values"] += values
