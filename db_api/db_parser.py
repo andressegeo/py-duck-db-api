@@ -69,36 +69,30 @@ class DBParser(object):
 
         return formated_headers
 
-    def json_to_header(self, json_field, use_referenced=False):
-        def insert_underscore(input):
-            indexes = [i for i, ltr in enumerate(input) if ltr.isupper()]
-            indexes.reverse()
-            for index in indexes:
-                input = input[0:index] + u"_" + input[index:].lower()
-            return input
+    def formated_to_header(self, json_field, use_referenced=False):
+        dependencies = self.generate_dependencies()
+        db_field = None
 
-        # Not a referenced field
-        if u"." not in json_field:
-            return u"`" + insert_underscore(self._table) + u"`.`" + insert_underscore(json_field) + u"`"
-        # Reference field
-        else:
-            table, field = tuple(json_field.split(u"."))
+        for field in dependencies[0]:
+            if field.get(u"formated") == json_field:
+                db_field = field.get(u"db")
+                break
 
-            if use_referenced:
-                for ref in self.get_columns_with_reference():
-                    if (ref[u"referenced_table_name"] == table
-                        and ref[u"referenced_column_name"] == field):
-                        table, field = ref[u"table_name"], ref[u"column_name"]
-                        break
+        if use_referenced:
+            for ref in dependencies[2]:
+                if db_field == (u"`" + ref[u"referenced_table_name"] + u"`.`" + ref[u"referenced_column_name"] + u"`"):
+                    db_field = (u"`" + ref[u"table_name"] + u"`.`" + ref[u"column_name"] + u"`")
+                    break
 
-            return u"`" + insert_underscore(table) + u"`.`" + insert_underscore(field) + u"`"
+        return db_field
+    
 
     def get_columns_with_reference(self):
         return [column for column in self._columns
             if u"referenced_table_name" in column]
 
     def is_field(self, key):
-        db_field = self.json_to_header(key)
+        db_field = self.formated_to_header(key)
 
         valid_columns = []
 
@@ -126,11 +120,10 @@ class DBParser(object):
 
         for filter in filters:
             for key in filter:
-
                 # If key is an operator
                 if self.is_field(key):
 
-                    db_field = self.json_to_header(key)
+                    db_field = self.formated_to_header(key)
                     value = self.get_wrapped_values([db_field], [filter[key]])
                     if type(filter[key]) in [unicode, str, int, float]:
 
@@ -145,7 +138,7 @@ class DBParser(object):
 
                 elif key in self._OPERATORS and parent is not None:
 
-                    db_field = self.json_to_header(parent)
+                    db_field = self.formated_to_header(parent)
                     value = self.get_wrapped_values([db_field], [filter[key]])
                     where[u"statements"].append(db_field + u" " + self._OPERATORS[key] + u" " + value)
                     where[u"values"].append(filter[key])
@@ -172,7 +165,7 @@ class DBParser(object):
             data[u"$set"] = self.to_one_level_json(data[u"$set"])
             db_fields, values = zip(*[
                 (
-                    self.json_to_header(field, use_referenced=True),
+                    self.formated_to_header(field, use_referenced=True),
                     data[u"$set"][field]
                 ) for field in data[u"$set"]]
             )
@@ -230,9 +223,9 @@ class DBParser(object):
         one_level_data = self.to_one_level_json(data)
 
         db_fields, insert[u"values"] = zip(*[
-            (self.json_to_header(field, use_referenced=True), one_level_data[field])
+            (self.formated_to_header(field, use_referenced=True), one_level_data[field])
             for field in one_level_data
-            if self._table in self.json_to_header(field, use_referenced=True)
+            if self._table in self.formated_to_header(field, use_referenced=True)
         ])
 
         insert[u"statements"] = insert[u"statements"].replace(u"#fields", u", ".join(list(db_fields)))
@@ -241,7 +234,7 @@ class DBParser(object):
         return insert
 
 
-    def generate_select_dependencies(self, parent_table=None, parent_path=None, filters=None):
+    def generate_dependencies(self, parent_table=None, parent_path=None, filters=None):
 
         table = parent_table or self._table
         j_tab = parent_path or []
@@ -261,7 +254,7 @@ class DBParser(object):
             new_parent_path = j_tab + [ref_col.get(u"referenced_table_name")]
             joins += [ref_col]
 
-            ret = self.generate_select_dependencies(
+            ret = self.generate_dependencies(
                 parent_table=ref_col.get(u"referenced_table_name"),
                 parent_path=new_parent_path
             )

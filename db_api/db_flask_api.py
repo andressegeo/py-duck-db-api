@@ -47,7 +47,7 @@ class DBFlaskAPI(object):
         if request.method == u"GET":
 
             items = self.db_connection.select(
-                *db_parser.generate_select_dependencies(filters=filters),
+                *db_parser.generate_dependencies(filters=filters),
                 formater=db_parser.rows_to_formated
             )
 

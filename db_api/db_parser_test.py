@@ -171,7 +171,7 @@ def test_parse_filters(db_parser):
     ret = db_parser.parse_filters({
         u"$or": [
             {
-                u"issue": u"val 1"
+                u"project.client.id": 1
             }, {
                 u"$and": [
                     {
@@ -187,8 +187,8 @@ def test_parse_filters(db_parser):
             }
         ]
     })
-    assert ret[u"statements"] == u"(`hour`.`issue` = %s OR (`hour`.`started_at` >= FROM_UNIXTIME(%s) AND `user`.`email` = %s))"
-    assert ret[u"values"][0] == u"val 1"
+    assert ret[u"statements"] == u"(`client`.`id` = %s OR (`hour`.`started_at` >= FROM_UNIXTIME(%s) AND `user`.`email` = %s))"
+    assert ret[u"values"][0] == 1
     assert ret[u"values"][1] == 1477180920
     assert ret[u"values"][2] == u"klambert@gpartner.eu"
 
@@ -218,13 +218,13 @@ def test_is_field(db_parser):
 
 def test_get_json_for_formatted_header(db_parser):
 
-    ret = db_parser.json_to_header(u"issue")
+    ret = db_parser.formated_to_header(u"issue")
     assert ret == u"`hour`.`issue`"
 
-    ret = db_parser.json_to_header(u"user.email")
+    ret = db_parser.formated_to_header(u"user.email")
     assert ret == u"`user`.`email`"
 
-    ret = db_parser.json_to_header(u"startedAt")
+    ret = db_parser.formated_to_header(u"startedAt")
     assert ret == u"`hour`.`started_at`"
 
 
@@ -318,9 +318,9 @@ def test_to_one_level_json(db_parser):
     assert transformed[u"user.email"] == u"klambert@gpartner.eu"
     assert transformed[u"project.id"] == 1
 
-def test_generate_select_dependencies(db_parser):
+def test_generate_dependencies(db_parser):
 
-    ret = db_parser.generate_select_dependencies()
+    ret = db_parser.generate_dependencies()
 
     assert len(ret[0]) == 12
     assert ret[1] == u"hour"
