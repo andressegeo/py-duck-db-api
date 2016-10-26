@@ -85,7 +85,7 @@ class DBParser(object):
                     break
 
         return db_field
-    
+
 
     def get_columns_with_reference(self):
         return [column for column in self._columns
@@ -185,16 +185,16 @@ class DBParser(object):
 
         return update
 
-    def to_one_level_json(self, obj, parent=u""):
+    def to_one_level_json(self, obj, parent=None):
         output = {}
-        if parent != u"":
-            parent += u"."
+        parent = parent or []
 
         for key in obj:
-            if type(obj[key]) is dict:
-                output.update(self.to_one_level_json(obj[key], parent=key))
+            if type(obj[key]) is not dict:
+                output[u".".join(parent + [key])] = obj[key]
             else:
-                output[(parent + key)] = obj[key]
+
+                output.update(self.to_one_level_json(obj[key], parent + [key]))
 
         return output
 
@@ -221,6 +221,8 @@ class DBParser(object):
         }
 
         one_level_data = self.to_one_level_json(data)
+
+        print(one_level_data)
 
         db_fields, insert[u"values"] = zip(*[
             (self.formated_to_header(field, use_referenced=True), one_level_data[field])

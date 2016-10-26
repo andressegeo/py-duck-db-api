@@ -106,6 +106,31 @@ def db_parser(mock_columns):
     return db_parser
 
 
+def test_to_one_level_json(db_parser):
+    transformed = db_parser.to_one_level_json(obj={
+        u"issue": u"test issue",
+        u"project": {
+            u"client": {
+                u"id": 1,
+                u"name": u"G Cloud"
+            },
+            u"id": 1,
+            u"name": u"Test"
+        },
+        u"user": {
+            u"id": 1,
+            u"email": u"klambert@gpartner.eu"
+        }
+    })
+    assert u"project.id" in transformed
+    assert u"user.email" in transformed
+    assert u"project.client.id" in transformed
+    assert u"project.client.name" in transformed
+    assert u"issue" in transformed
+    assert transformed[u"user.email"] == u"klambert@gpartner.eu"
+    assert transformed[u"project.id"] == 1
+
+
 def test_get_wrapped_values(db_parser):
     wrapped_values = db_parser.get_wrapped_values(headers=[
             u"`hour`.`issue`",
@@ -298,25 +323,6 @@ def test_parse_insert(db_parser):
     assert ret[u"values"][4] == u"test"
     assert ret[u"values"][5] == u"test"
 
-
-def test_to_one_level_json(db_parser):
-    transformed = db_parser.to_one_level_json(obj={
-        u"issue": u"test issue",
-        u"project": {
-            u"id": 1,
-            u"name": u"Test"
-        },
-        u"user": {
-            u"id": 1,
-            u"email": u"klambert@gpartner.eu"
-        }
-    })
-
-    assert u"project.id" in transformed
-    assert u"user.email" in transformed
-    assert u"issue" in transformed
-    assert transformed[u"user.email"] == u"klambert@gpartner.eu"
-    assert transformed[u"project.id"] == 1
 
 def test_generate_dependencies(db_parser):
 
