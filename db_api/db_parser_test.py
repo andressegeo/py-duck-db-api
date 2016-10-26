@@ -44,6 +44,23 @@ def mock_columns():
             "column_name": "name"
         },
         {
+            "type": "int(11)",
+            "table_name": "client",
+            "column_name": "id"
+        },
+        {
+            "type": "varchar(45)",
+            "table_name": "client",
+            "column_name": "name"
+        },
+        {
+            "table_name": "project",
+            "referenced_table_name": "client",
+            "type": "int(11)",
+            "referenced_column_name": "id",
+            "column_name": "client_id"
+        },
+        {
             "table_name": "hour",
             "referenced_table_name": "project",
             "type": "int(11)",
@@ -78,6 +95,7 @@ def mock_columns():
 
 
 
+
 @pytest.fixture(scope=u"function")
 def db_parser(mock_columns):
     db_parser = DBParser(
@@ -86,6 +104,7 @@ def db_parser(mock_columns):
     )
 
     return db_parser
+
 
 def test_get_wrapped_values(db_parser):
     wrapped_values = db_parser.get_wrapped_values(headers=[
@@ -115,6 +134,7 @@ def test_get_wrapped_values(db_parser):
     )
 
     assert wrapped_values == u"%s, %s, %s"
+
 
 def test_parse_filters(db_parser):
     ret = db_parser.parse_filters({
@@ -297,3 +317,13 @@ def test_to_one_level_json(db_parser):
     assert u"issue" in transformed
     assert transformed[u"user.email"] == u"klambert@gpartner.eu"
     assert transformed[u"project.id"] == 1
+
+def test_generate_select_dependencies(db_parser):
+
+    ret = db_parser.generate_select_dependencies()
+
+    assert len(ret[0]) == 12
+    assert ret[1] == u"hour"
+    assert len(ret[2]) == 3
+    # import json
+    # print(json.dumps(ret, indent=4))

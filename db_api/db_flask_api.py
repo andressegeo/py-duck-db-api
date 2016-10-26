@@ -46,13 +46,13 @@ class DBFlaskAPI(object):
 
         if request.method == u"GET":
 
-            headers, rows = self.db_connection.select(
-                table=table,
-                where=db_parser.parse_filters(filters)
+            items = self.db_connection.select(
+                *db_parser.generate_select_dependencies(filters=filters),
+                formater=db_parser.rows_to_formated
             )
 
             result = {
-                u"items": db_parser.rows_to_json(table, headers, rows)
+                u"items": items
             }
 
         elif request.method == u"PUT":

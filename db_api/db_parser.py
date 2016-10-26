@@ -46,25 +46,16 @@ class DBParser(object):
         else:
             return val
 
-    def rows_to_json(self, table, headers, rows):
+    def rows_to_formated(self, headers, rows, fields):
 
-        def get_table_column_from_header(headers):
-            decomposed = [(re.search(u"`(\S+)+`\.*`(\S+)+`", header)).groups() for header in headers]
-            return decomposed
-
-        decomposed_headers = get_table_column_from_header(headers)
         items = []
         for row in rows:
             item = {}
             for index, cell in enumerate(row):
-                cell = self.python_type_to_json(cell)
-                j_field = self.headers_to_json(decomposed_headers[index])
-                if table == decomposed_headers[index][0]:
-                    item[j_field[1]] = cell
-                else:
-                    self.json_put(item, j_field[0] + u"." + j_field[1], cell)
+                item = self.json_put(item, fields[index][u'formated'], self.python_type_to_json(cell))
 
             items.append(item)
+
         return items
 
     def headers_to_json(self, headers):
@@ -244,9 +235,51 @@ class DBParser(object):
             if self._table in self.json_to_header(field, use_referenced=True)
         ])
 
-
         insert[u"statements"] = insert[u"statements"].replace(u"#fields", u", ".join(list(db_fields)))
         insert[u"statements"] = insert[u"statements"].replace(u"#values", self.get_wrapped_values(db_fields, insert[u"values"]))
 
-
         return insert
+
+
+    def generate_select_dependencies(self, parent_table=None, parent_path=None, filters=None):
+
+        table = parent_table or self._table
+        j_tab = parent_path or []
+
+        fields, joins = [], []
+        for col in [col for col in self._columns if col.get(u"table_name") == table and u"referenced_table_name" not in col]:
+            fields.append({
+                u"db": u"`" + col.get(u"table_name") + u"`.`" + col.get(u"column_name") + u"`",
+                u"formated": u".".join(j_tab + [col.get(u"column_name")])
+            })
+
+        for ref_col in [
+            col for col in self._columns
+            if (u"referenced_table_name" in col and col.get(u"table_name") == table)
+        ]:
+
+            new_parent_path = j_tab + [ref_col.get(u"referenced_table_name")]
+            joins += [ref_col]
+
+            ret = self.generate_select_dependencies(
+                parent_table=ref_col.get(u"referenced_table_name"),
+                parent_path=new_parent_path
+            )
+
+            fields += ret[0]
+            joins += ret[2]
+
+        # Then format JSON
+        fields = [
+            {
+                u"formated": self.headers_to_json([field.get(u"formated")])[0],
+                u"db": field.get(u"db")
+            } for field in fields]
+
+        # Return
+        return [
+            fields,
+            self._table,
+            joins,
+            self.parse_filters(filters)
+        ]
