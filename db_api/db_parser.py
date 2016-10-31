@@ -84,11 +84,11 @@ class DBParser(object):
 
         if use_referenced:
             for ref in dependencies[2]:
-                if db_field == (u"`" + ref[u"referenced_table_name"] + u"`.`" + ref[u"referenced_column_name"] + u"`"):
+                if db_field == (u"`" + ref[u"referenced_alias"] + u"`.`" + ref[u"referenced_column_name"] + u"`"):
                     db_field = (u"`" + ref[u"table_name"] + u"`.`" + ref[u"column_name"] + u"`")
                     break
 
-
+        print(db_field)
         return db_field
 
 
@@ -163,8 +163,6 @@ class DBParser(object):
             u"values": []
         }
 
-
-
         if u"$set" in data:
             data[u"$set"] = self.to_one_level_json(data[u"$set"])
             db_fields, values = zip(*[
@@ -173,6 +171,7 @@ class DBParser(object):
                     data[u"$set"][field]
                 ) for field in data[u"$set"]]
             )
+            print(db_fields)
 
             for index, db_field in enumerate(db_fields):
                 if self._table in db_field:
@@ -242,10 +241,12 @@ class DBParser(object):
 
         table = parent_table or self._table
         j_tab = parent_path or []
-
+        alias = table
+        if parent_path is not None:
+            alias = parent_path[-1]
         fields, joins = [], []
         # For each column which doesn't have any relation
-        for col in [col for col in self._columns if col.get(u"table_name") == table and u"referenced_table_name" not in col]:
+        for col in [col for col in self._columns if col.get(u"alias", col.get(u"table_name")) == alias and u"referenced_table_name" not in col]:
 
 
             fields.append({
@@ -258,7 +259,6 @@ class DBParser(object):
             col for col in self._columns
             if (u"referenced_table_name" in col and col.get(u"table_name") == table)
         ]:
-
             new_parent_path = j_tab + [ref_col.get(u"referenced_alias")]
             joins += [ref_col]
 
@@ -266,18 +266,17 @@ class DBParser(object):
                 parent_table=ref_col.get(u"referenced_table_name"),
                 parent_path=new_parent_path
             )
-
-
             fields += ret[0]
             joins += ret[2]
 
+
         # Then format JSON
-        print(json.dumps(fields))
         fields = [
             {
                 u"formated": self.headers_to_json([field.get(u"formated")])[0],
                 u"db": field.get(u"db")
             } for field in fields]
+
 
 
         # Return

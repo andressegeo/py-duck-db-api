@@ -6,15 +6,28 @@ from db_api.db_flask_api import DBFlaskAPI
 from db_api.db_parser import DBParser
 from db_api.db_connection import DBConnection
 import json
-
+#
 db_flask_api = DBFlaskAPI(
     db_api_def=MySQLdb,
     db_user=u"root",
     db_password=u"localroot1234",
     db_name=u"hours_count",
     db_connection_def=DBConnection,
-    db_parser_def=DBParser
+    db_parser_def=DBParser,
+    db_host=u"127.0.0.1"
 )
+
+
+
+# db_flask_api = DBFlaskAPI(
+#     db_api_def=MySQLdb,
+#     db_user=u"jd2",
+#     db_password=u"123456",
+#     db_name=u"wsr",
+#     db_connection_def=DBConnection,
+#     db_parser_def=DBParser,
+#     db_host=u"173.194.226.132"
+# )
 
 app = Flask(__name__)
 

@@ -13,14 +13,16 @@ class DBFlaskAPI(object):
             db_password,
             db_name,
             db_connection_def,
-            db_parser_def
+            db_parser_def,
+            db_host
     ):
         self._db_api_def = db_api_def
         self.db_connection = db_connection_def(
             db_api_def=db_api_def,
             user=db_user,
             password=db_password,
-            database=db_name
+            database=db_name,
+            host=db_host
         )
 
         self.__db_parser_def = db_parser_def

@@ -100,7 +100,7 @@ class DBConnection(object):
 
     def select(self, fields, table, joins, where=None, formater=None):
         headers = [field.get(u"db") for field in fields]
-        print(json.dumps(joins, indent=4))
+
         joins = [
             (
                 u"JOIN `" + ref.get(u"referenced_table_name")

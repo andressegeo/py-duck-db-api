@@ -4,7 +4,6 @@ import pytest
 from db_parser import DBParser
 
 
-
 @pytest.fixture(scope=u"function")
 def mock_columns():
     return [
@@ -40,93 +39,93 @@ def mock_columns():
         },
         {
             "type": "int(11)",
-            "alias": "project_id_project",
+            "alias": "project",
             "table_name": "project",
             "column_name": "id"
         },
         {
             "type": "varchar(45)",
-            "alias": "project_id_project",
+            "alias": "project",
             "table_name": "project",
             "column_name": "name"
         },
         {
             "type": "int(11)",
-            "alias": "client_id_client",
+            "alias": "client",
             "table_name": "client",
             "column_name": "id"
         },
         {
             "type": "varchar(45)",
-            "alias": "client_id_client",
+            "alias": "client",
             "table_name": "client",
             "column_name": "name"
         },
         {
-            "referenced_alias": "client_id_client",
+            "referenced_alias": "client",
             "referenced_column_name": "id",
             "referenced_table_name": "client",
-            "alias": "project_id_project",
+            "alias": "project",
             "table_name": "project",
             "type": "int(11)",
-            "column_name": "client_id"
+            "column_name": "client"
         },
         {
-            "referenced_alias": "project_id_project",
+            "referenced_alias": "project",
             "referenced_column_name": "id",
             "referenced_table_name": "project",
             "alias": "hour",
             "table_name": "hour",
             "type": "int(11)",
-            "column_name": "project_id"
+            "column_name": "project"
         },
         {
             "type": "int(11)",
-            "alias": "user_id_user",
+            "alias": "affected_to",
             "table_name": "user",
             "column_name": "id"
         },
         {
             "type": "varchar(255)",
-            "alias": "user_id_user",
+            "alias": "affected_to",
             "table_name": "user",
             "column_name": "email"
         },
         {
             "type": "varchar(255)",
-            "alias": "user_id_user",
+            "alias": "affected_to",
             "table_name": "user",
             "column_name": "name"
         },
         {
-            "referenced_alias": "user_id_user",
+            "referenced_alias": "affected_to",
             "referenced_column_name": "id",
             "referenced_table_name": "user",
             "alias": "hour",
             "table_name": "hour",
             "type": "int(11)",
-            "column_name": "user_id"
+            "column_name": "affected_to"
         },
         {
             "type": "int(11)",
-            "alias": "created_by_user",
+            "alias": "created_by",
             "table_name": "user",
             "column_name": "id"
         },
         {
             "type": "varchar(255)",
-            "alias": "created_by_user",
+            "alias": "created_by",
             "table_name": "user",
             "column_name": "email"
         },
         {
             "type": "varchar(255)",
-            "alias": "created_by_user",
+            "alias": "created_by",
             "table_name": "user",
             "column_name": "name"
         },
         {
-            "referenced_alias": "created_by_user",
+            "referenced_alias": "created_by",
             "referenced_column_name": "id",
             "referenced_table_name": "user",
             "alias": "hour",
@@ -135,6 +134,7 @@ def mock_columns():
             "column_name": "created_by"
         }
     ]
+
 
 
 
@@ -253,7 +253,7 @@ def test_parse_filters(db_parser):
                             u"$gte": 1477180920
                         }
                     }, {
-                        u"user.email": {
+                        u"affectedTo.email": {
                             u"$eq": u"klambert@gpartner.eu"
                         }
                     }
@@ -262,19 +262,17 @@ def test_parse_filters(db_parser):
         ]
     })
 
-    import json
-    print(json.dumps(ret, indent=4))
-    assert ret[u"statements"] == u"(`client_id_client`.`id` = %s OR (`hour`.`started_at` >= FROM_UNIXTIME(%s) AND `user_id_user`.`email` = %s))"
+    assert ret[u"statements"] == u"(`client`.`id` = %s OR (`hour`.`started_at` >= FROM_UNIXTIME(%s) AND `affected_to`.`email` = %s))"
     assert ret[u"values"][0] == 1
     assert ret[u"values"][1] == 1477180920
     assert ret[u"values"][2] == u"klambert@gpartner.eu"
 
 
     ret = db_parser.parse_filters({
-        u"user.id": 1
+        u"affectedTo.id": 1
     })
 
-    assert ret[u"statements"] == u"`user_id_user`.`id` = %s"
+    assert ret[u"statements"] == u"`affected_to`.`id` = %s"
     assert ret[u"values"][0] == 1
 
 
@@ -286,7 +284,7 @@ def test_is_field(db_parser):
     ret = db_parser.is_field(u"badField")
     assert ret is False
 
-    ret = db_parser.is_field(u"user.email")
+    ret = db_parser.is_field(u"affectedTo.email")
     assert ret is True
 
     ret = db_parser.is_field(u"startedAt")
@@ -298,8 +296,8 @@ def test_get_json_for_formatted_header(db_parser):
     ret = db_parser.formated_to_header(u"issue")
     assert ret == u"`hour`.`issue`"
 
-    ret = db_parser.formated_to_header(u"user.email")
-    assert ret == u"`user_id_user`.`email`"
+    ret = db_parser.formated_to_header(u"affectedTo.email")
+    assert ret == u"`affected_to`.`email`"
 
     ret = db_parser.formated_to_header(u"startedAt")
     assert ret == u"`hour`.`started_at`"
@@ -320,19 +318,19 @@ def test_parse_update(db_parser):
 
     ret = db_parser.parse_update({
         u"$set": {
-            u"user.id": 1,
+            u"affectedTo.id": 1,
             u"project.id": 1,
-            u"startedAt" : 1477434540
+            u"startedAt": 1477434540
         }
     })
 
-    assert ret[u"statements"] == u"SET `hour`.`user_id` = %s, `hour`.`project_id` = %s, `hour`.`started_at` = FROM_UNIXTIME(%s)"
+    assert ret[u"statements"] == u"SET `hour`.`affected_to` = %s, `hour`.`project` = %s, `hour`.`started_at` = FROM_UNIXTIME(%s)"
     assert ret[u"values"][0] == 1
     assert ret[u"values"][1] == 1
 
     ret = db_parser.parse_update({
         u"$set": {
-            u"user": {
+            u"affectedTo": {
                 u"id": 1,
                 u"name" : "Kevin LAMBERT"
             },
@@ -343,7 +341,7 @@ def test_parse_update(db_parser):
         }
     })
 
-    assert ret[u"statements"] == u"SET `hour`.`user_id` = %s, `hour`.`project_id` = %s"
+    assert ret[u"statements"] == u"SET `hour`.`affected_to` = %s, `hour`.`project` = %s"
     assert ret[u"values"][0] == 1
     assert ret[u"values"][1] == 1
 
@@ -379,11 +377,6 @@ def test_parse_insert(db_parser):
 def test_generate_dependencies(db_parser):
 
     ret = db_parser.generate_dependencies()
-
-    import json
-    print(json.dumps(ret, indent=4))
-    assert len(ret[0]) == 21
+    assert len(ret[0]) == 15
     assert ret[1] == u"hour"
     assert len(ret[2]) == 4
-    # import json
-    # print(json.dumps(ret, indent=4))
