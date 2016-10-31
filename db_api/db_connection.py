@@ -48,7 +48,7 @@ class DBConnection(object):
                 u"column_name": constraint[1],
                 u"referenced_table_name": constraint[2],
                 u"referenced_column_name": constraint[3],
-                u"referenced_alias": constraint[1] + u"_" + constraint[2]
+                u"referenced_alias": constraint[1]
             }
             for constraint in cursor.fetchall()
             ]
@@ -91,7 +91,7 @@ class DBConnection(object):
                     column.update(ref)
                     columns += self.get_columns(
                         ref.get(u"referenced_table_name"),
-                        alias=ref.get(u"column_name") + u"_" + ref.get(u"referenced_table_name")
+                        alias=ref.get(u"column_name")
                     )
                     break
             columns.append(column)

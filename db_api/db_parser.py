@@ -59,8 +59,11 @@ class DBParser(object):
         return items
 
     def headers_to_json(self, headers):
+
+
         formated_headers = []
         for header in headers:
+
             while header.find(u"_") != -1:
                 found = header.find(u"_")
                 header = header[:found] + header[found+1].upper() + header[found+2:]
@@ -256,7 +259,7 @@ class DBParser(object):
             if (u"referenced_table_name" in col and col.get(u"table_name") == table)
         ]:
 
-            new_parent_path = j_tab + [ref_col.get(u"referenced_table_name")]
+            new_parent_path = j_tab + [ref_col.get(u"referenced_alias")]
             joins += [ref_col]
 
             ret = self.generate_dependencies(
@@ -269,6 +272,7 @@ class DBParser(object):
             joins += ret[2]
 
         # Then format JSON
+        print(json.dumps(fields))
         fields = [
             {
                 u"formated": self.headers_to_json([field.get(u"formated")])[0],
