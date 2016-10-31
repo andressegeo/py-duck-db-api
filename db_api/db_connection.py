@@ -2,7 +2,7 @@
 
 import datetime
 import calendar
-
+import json
 
 class DBConnection(object):
     def __init__(
@@ -47,7 +47,8 @@ class DBConnection(object):
                 u"table_name": constraint[0],
                 u"column_name": constraint[1],
                 u"referenced_table_name": constraint[2],
-                u"referenced_column_name": constraint[3]
+                u"referenced_column_name": constraint[3],
+                u"referenced_alias": constraint[1] + u"_" + constraint[2]
             }
             for constraint in cursor.fetchall()
             ]
@@ -57,7 +58,7 @@ class DBConnection(object):
 
         return referenced
 
-    def get_columns(self, table):
+    def get_columns(self, table, alias=None):
 
         referenced = self.get_referenced(table)
         cursor = self._db.cursor()
@@ -76,6 +77,11 @@ class DBConnection(object):
                 u"column_name": row[0],
                 u"type": row[1]
             }
+            if alias is not None:
+                column[u"alias"] = alias
+            else:
+                column[u"alias"] = table
+
             # If reference found, add it
             for ref in referenced:
                 if (
@@ -83,21 +89,26 @@ class DBConnection(object):
                     and ref.get(u"column_name") == column.get(u"column_name")
                 ):
                     column.update(ref)
-                    columns += self.get_columns(ref.get(u"referenced_table_name"))
+                    columns += self.get_columns(
+                        ref.get(u"referenced_table_name"),
+                        alias=ref.get(u"column_name") + u"_" + ref.get(u"referenced_table_name")
+                    )
                     break
             columns.append(column)
-
         return columns
 
 
     def select(self, fields, table, joins, where=None, formater=None):
         headers = [field.get(u"db") for field in fields]
+        print(json.dumps(joins, indent=4))
         joins = [
             (
-                u"JOIN " + ref.get(u"referenced_table_name") + u" ON `"
-                + ref.get(u"table_name")
+                u"JOIN `" + ref.get(u"referenced_table_name")
+                + u"` AS `" + ref.get(u"referenced_alias")
+                + u"` ON `"
+                + ref.get(u"alias")
                 + u"`.`" + ref.get(u"column_name") + u"` = `"
-                + ref.get(u"referenced_table_name")
+                + ref.get(u"referenced_alias")
                 + u"`.`" + ref.get(u"referenced_column_name") + u"`"
             )
             for ref in joins
@@ -111,6 +122,7 @@ class DBConnection(object):
             query = query + u" WHERE " + where[u"statements"]
 
         cursor = self._db.cursor()
+        print(query)
         cursor.execute(query, where[u'values'])
 
         # If formater in parameter

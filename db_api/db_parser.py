@@ -3,7 +3,7 @@
 import datetime
 import calendar
 import re
-
+import json
 
 class DBParser(object):
 
@@ -71,6 +71,7 @@ class DBParser(object):
 
     def formated_to_header(self, json_field, use_referenced=False):
         dependencies = self.generate_dependencies()
+
         db_field = None
 
         for field in dependencies[0]:
@@ -84,6 +85,7 @@ class DBParser(object):
                     db_field = (u"`" + ref[u"table_name"] + u"`.`" + ref[u"column_name"] + u"`")
                     break
 
+
         return db_field
 
 
@@ -92,16 +94,16 @@ class DBParser(object):
             if u"referenced_table_name" in column]
 
     def is_field(self, key):
-        db_field = self.formated_to_header(key)
 
+        db_field = self.formated_to_header(key)
         valid_columns = []
 
         for column in self._columns:
-            valid_columns.append(u"`" + column[u"table_name"]
+            valid_columns.append(u"`" + column[u"alias"]
                 + u"`.`" + column[u"column_name"] + u"`"
             )
             if u"referenced_table_name" in column:
-                valid_columns.append(u"`" + column[u"referenced_table_name"]
+                valid_columns.append(u"`" + column[u"alias"]
                     + u"`.`" + column[u"referenced_column_name"] + u"`"
                 )
 
@@ -122,7 +124,6 @@ class DBParser(object):
             for key in filter:
                 # If key is an operator
                 if self.is_field(key):
-
                     db_field = self.formated_to_header(key)
                     value = self.get_wrapped_values([db_field], [filter[key]])
                     if type(filter[key]) in [unicode, str, int, float]:
@@ -204,7 +205,8 @@ class DBParser(object):
 
         for index, header in enumerate(headers):
             for column in self._columns:
-                if (u"`" + column[u"table_name"] + u"`.`" + column[u"column_name"] + u"`") == header:
+
+                if (u"`" + column.get(u"alias", column.get(u"table_name")) + u"`.`" + column[u"column_name"] + u"`") == header:
 
                     if u"datetime" in column[u"type"] and type(values[index]) in [int, float]:
                         output.append(u"FROM_UNIXTIME(%s)")
@@ -221,9 +223,6 @@ class DBParser(object):
         }
 
         one_level_data = self.to_one_level_json(data)
-
-        print(one_level_data)
-
         db_fields, insert[u"values"] = zip(*[
             (self.formated_to_header(field, use_referenced=True), one_level_data[field])
             for field in one_level_data
@@ -242,12 +241,16 @@ class DBParser(object):
         j_tab = parent_path or []
 
         fields, joins = [], []
+        # For each column which doesn't have any relation
         for col in [col for col in self._columns if col.get(u"table_name") == table and u"referenced_table_name" not in col]:
+
+
             fields.append({
-                u"db": u"`" + col.get(u"table_name") + u"`.`" + col.get(u"column_name") + u"`",
+                u"db": u"`" + col.get(u"alias") + u"`.`" + col.get(u"column_name") + u"`",
                 u"formated": u".".join(j_tab + [col.get(u"column_name")])
             })
 
+        # For each column which has a relation
         for ref_col in [
             col for col in self._columns
             if (u"referenced_table_name" in col and col.get(u"table_name") == table)
@@ -261,6 +264,7 @@ class DBParser(object):
                 parent_path=new_parent_path
             )
 
+
             fields += ret[0]
             joins += ret[2]
 
@@ -270,6 +274,7 @@ class DBParser(object):
                 u"formated": self.headers_to_json([field.get(u"formated")])[0],
                 u"db": field.get(u"db")
             } for field in fields]
+
 
         # Return
         return [
