@@ -54,17 +54,19 @@ def mock_columns():
             "column_name": "name"
         },
         {
-            "table_name": "project",
-            "referenced_table_name": "client",
-            "type": "int(11)",
             "referenced_column_name": "id",
+            "referenced_table_name": "client",
+            "alias": "client_id_client",
+            "table_name": "project",
+            "type": "int(11)",
             "column_name": "client_id"
         },
         {
-            "table_name": "hour",
-            "referenced_table_name": "project",
-            "type": "int(11)",
             "referenced_column_name": "id",
+            "referenced_table_name": "project",
+            "alias": "project_id_project",
+            "table_name": "hour",
+            "type": "int(11)",
             "column_name": "project_id"
         },
         {
@@ -83,13 +85,38 @@ def mock_columns():
             "column_name": "name"
         },
         {
-            "table_name": "hour",
-            "referenced_table_name": "user",
-            "type": "int(11)",
             "referenced_column_name": "id",
+            "referenced_table_name": "user",
+            "alias": "user_id_user",
+            "table_name": "hour",
+            "type": "int(11)",
             "column_name": "user_id"
+        },
+        {
+            "type": "int(11)",
+            "table_name": "user",
+            "column_name": "id"
+        },
+        {
+            "type": "varchar(255)",
+            "table_name": "user",
+            "column_name": "email"
+        },
+        {
+            "type": "varchar(255)",
+            "table_name": "user",
+            "column_name": "name"
+        },
+        {
+            "referenced_column_name": "id",
+            "referenced_table_name": "user",
+            "alias": "created_by_user",
+            "table_name": "hour",
+            "type": "int(11)",
+            "column_name": "created_by"
         }
     ]
+
 
 
 
@@ -212,7 +239,7 @@ def test_parse_filters(db_parser):
             }
         ]
     })
-    assert ret[u"statements"] == u"(`client`.`id` = %s OR (`hour`.`started_at` >= FROM_UNIXTIME(%s) AND `user`.`email` = %s))"
+    assert ret[u"statements"] == u"(`client_id_client`.`id` = %s OR (`hour`.`started_at` >= FROM_UNIXTIME(%s) AND `user_id_user`.`email` = %s))"
     assert ret[u"values"][0] == 1
     assert ret[u"values"][1] == 1477180920
     assert ret[u"values"][2] == u"klambert@gpartner.eu"
@@ -247,7 +274,7 @@ def test_get_json_for_formatted_header(db_parser):
     assert ret == u"`hour`.`issue`"
 
     ret = db_parser.formated_to_header(u"user.email")
-    assert ret == u"`user`.`email`"
+    assert ret == u"`user_id_user`.`email`"
 
     ret = db_parser.formated_to_header(u"startedAt")
     assert ret == u"`hour`.`started_at`"
@@ -327,9 +354,8 @@ def test_parse_insert(db_parser):
 def test_generate_dependencies(db_parser):
 
     ret = db_parser.generate_dependencies()
-
-    assert len(ret[0]) == 12
+    assert len(ret[0]) == 21
     assert ret[1] == u"hour"
-    assert len(ret[2]) == 3
+    assert len(ret[2]) == 4
     # import json
     # print(json.dumps(ret, indent=4))
