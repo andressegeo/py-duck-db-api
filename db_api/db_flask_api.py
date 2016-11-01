@@ -43,13 +43,14 @@ class DBFlaskAPI(object):
             filters = json.loads(filters, encoding=u"utf-8")
 
         if data is not None and data != u"":
-
             data = json.loads(data, encoding=u"utf-8")
 
+        dependencies = db_parser.generate_dependencies(filters=filters)
+        print(json.dumps(dependencies, indent=4))
         if request.method == u"GET":
 
             items = self.db_connection.select(
-                *db_parser.generate_dependencies(filters=filters),
+                *dependencies,
                 formater=db_parser.rows_to_formated
             )
 
@@ -64,7 +65,8 @@ class DBFlaskAPI(object):
                 update=db_parser.parse_update(
                     data=data
                 ),
-                where=db_parser.parse_filters(filters)
+                joins=dependencies[2],
+                where=dependencies[3]
             )
 
             result = {
@@ -75,7 +77,8 @@ class DBFlaskAPI(object):
 
             count = self.db_connection.delete(
                 table=table,
-                where=db_parser.parse_filters(filters)
+                joins=dependencies[2],
+                where=dependencies[3]
             )
 
             result = {

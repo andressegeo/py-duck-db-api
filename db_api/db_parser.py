@@ -88,7 +88,6 @@ class DBParser(object):
                     db_field = (u"`" + ref[u"table_name"] + u"`.`" + ref[u"column_name"] + u"`")
                     break
 
-        print(db_field)
         return db_field
 
 
@@ -171,15 +170,12 @@ class DBParser(object):
                     data[u"$set"][field]
                 ) for field in data[u"$set"]]
             )
-            print(db_fields)
 
             for index, db_field in enumerate(db_fields):
                 if self._table in db_field:
                     wrapped = self.get_wrapped_values([db_field], [values[index]])
                     update[u"statements"] += [(db_field + u" = " + wrapped)]
                     update[u"values"].append(values[index])
-
-
 
         update[u"statements"] = u", ".join(update[u"statements"])
 
@@ -247,8 +243,6 @@ class DBParser(object):
         fields, joins = [], []
         # For each column which doesn't have any relation
         for col in [col for col in self._columns if col.get(u"alias", col.get(u"table_name")) == alias and u"referenced_table_name" not in col]:
-
-
             fields.append({
                 u"db": u"`" + col.get(u"alias") + u"`.`" + col.get(u"column_name") + u"`",
                 u"formated": u".".join(j_tab + [col.get(u"column_name")])

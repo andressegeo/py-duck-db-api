@@ -97,7 +97,6 @@ class DBConnection(object):
             columns.append(column)
         return columns
 
-
     def select(self, fields, table, joins, where=None, formater=None):
         headers = [field.get(u"db") for field in fields]
 
@@ -122,7 +121,6 @@ class DBConnection(object):
             query = query + u" WHERE " + where[u"statements"]
 
         cursor = self._db.cursor()
-        print(query)
         cursor.execute(query, where[u'values'])
 
         # If formater in parameter
@@ -135,36 +133,63 @@ class DBConnection(object):
 
         return headers, cursor.fetchall()
 
-    def update(self, table, update, where):
+    def update(self, table, joins, update, where):
 
         if where[u"statements"] != u"":
             where[u"statements"] = u" WHERE " + where[u"statements"]
 
-        query = u"""UPDATE """ + table + u""" """ + update[u"statements"] + where[u"statements"]
+        joins = u" ".join([
+            (
+                u"JOIN `" + ref.get(u"referenced_table_name")
+                + u"` AS `" + ref.get(u"referenced_alias")
+                + u"` ON `"
+                + ref.get(u"alias")
+                + u"`.`" + ref.get(u"column_name") + u"` = `"
+                + ref.get(u"referenced_alias")
+                + u"`.`" + ref.get(u"referenced_column_name") + u"`"
+            )
+            for ref in joins
+        ])
+
+        query = u"""UPDATE """ + table + u" " + joins + u""" """ + update[u"statements"] + where[u"statements"]
+
 
         cursor = self._db.cursor()
 
-        cursor.execute(u"SELECT COUNT(*) FROM " + table + u" " + where[u"statements"], where[u"values"])
+        cursor.execute(u"SELECT COUNT(*) FROM " + table + u" " + joins + u" " + where[u"statements"], where[u"values"])
         count = cursor.fetchall()[0][0]
 
-        print(query)
         cursor.execute(query, update[u"values"] + where[u"values"])
         cursor.connection.commit()
 
         return count
 
-    def delete(self, table, where):
+    def delete(self, table, joins, where):
 
         if where[u"statements"] != u"":
             where[u"statements"] = u"WHERE " + where[u"statements"]
 
+        joins = u" ".join([
+            (
+                u"JOIN `" + ref.get(u"referenced_table_name")
+                + u"` AS `" + ref.get(u"referenced_alias")
+                + u"` ON `"
+                + ref.get(u"alias")
+                + u"`.`" + ref.get(u"column_name") + u"` = `"
+                + ref.get(u"referenced_alias")
+                + u"`.`" + ref.get(u"referenced_column_name") + u"`"
+            )
+            for ref in joins
+        ])
+
         query = u"""
-        DELETE FROM """ + table + u""" """ + where[u"statements"]
+        DELETE """ + table + u" FROM " + table + u" " + joins + u""" """ + where[u"statements"]
 
         cursor = self._db.cursor()
 
-        cursor.execute(u"SELECT COUNT(*) FROM " + table + u" " + where[u"statements"], where[u"values"])
+        cursor.execute(u"SELECT COUNT(*) FROM " + table + u" " + joins + u" " + where[u"statements"], where[u"values"])
         count = cursor.fetchall()[0][0]
+
 
         cursor.execute(query, where[u"values"])
 

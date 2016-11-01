@@ -356,22 +356,30 @@ def test_parse_insert(db_parser):
             u"name": u"Interne"
         },
         u"startedAt": 1476057600,
-        u"user": {
+        u"affectedTo": {
             u"email": u"klambert@gpartner.eu",
             u"id": 1,
             u"name": u"Kévin LAMBERT"
         }
     })
 
-    assert ret[u"statements"] == u" ".join([
-        u"INSERT INTO",
-        u"`hour`(`hour`.`project_id`, `hour`.`started_at`, `hour`.`user_id`, `hour`.`minutes`, `hour`.`issue`, `hour`.`comments`)",
-        u"VALUES(%s, FROM_UNIXTIME(%s), %s, %s, %s, %s)"
-    ])
+    columns_to_check = [
+        u"`hour`.`project`",
+        u"`hour`.`started_at`",
+        u"`hour`.`affected_to`",
+        u"`hour`.`minutes`",
+        u"`hour`.`issue`",
+        u"`hour`.`comments`"
+    ]
 
-    assert ret[u"values"][0] == 1
-    assert ret[u"values"][4] == u"test"
-    assert ret[u"values"][5] == u"test"
+    assert u"INSERT INTO `hour`" in ret[u"statements"]
+    for column_to_check in columns_to_check:
+        assert column_to_check in ret[u"statements"]
+    str_vals = u",".join([str(val) for val in ret[u"values"]])
+
+    # Check if values are in array
+    for val in (5, 1, 1, u'test', u'test', 1476057600):
+        assert str(val) in str_vals
 
 
 def test_generate_dependencies(db_parser):
