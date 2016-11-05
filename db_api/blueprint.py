@@ -34,7 +34,7 @@ def construct_db_api_blueprint(
         db_host=db_host
     )
 
-    db_api_blueprint = Blueprint(u'user_api', __name__)
+    db_api_blueprint = Blueprint(u'db_api', __name__)
 
     @db_api_blueprint.route('/db/<string:table>', methods=[u"POST", u"PUT", u"DELETE", u"GET"])
     def table_request(table):
