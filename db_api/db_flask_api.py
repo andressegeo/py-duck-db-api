@@ -46,7 +46,6 @@ class DBFlaskAPI(object):
             data = json.loads(data, encoding=u"utf-8")
 
         dependencies = db_parser.generate_dependencies(filters=filters)
-        print(json.dumps(dependencies, indent=4))
         if request.method == u"GET":
 
             items = self.db_connection.select(
