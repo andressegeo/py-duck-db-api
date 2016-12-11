@@ -6,6 +6,16 @@ import MySQLdb
 
 app = Flask(__name__)
 
+from db_api.db_connection import DBConnection
+
+conn = DBConnection(
+    db_api_def=MySQLdb,
+    host=u"127.0.0.1",
+    user=u"root",
+    password=u"localroot1234",
+    database=u"hours_count"
+)
+
 app.register_blueprint(construct_db_api_blueprint(
     db_driver=MySQLdb,
     db_host=u"127.0.0.1",

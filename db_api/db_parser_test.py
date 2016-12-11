@@ -136,15 +136,6 @@ def mock_columns():
     ]
 
 
-
-
-
-
-
-
-
-
-
 @pytest.fixture(scope=u"function")
 def db_parser(mock_columns):
     db_parser = DBParser(
@@ -388,3 +379,74 @@ def test_generate_dependencies(db_parser):
     assert len(ret[0]) == 15
     assert ret[1] == u"hour"
     assert len(ret[2]) == 4
+
+
+def test_generete_description(db_parser):
+
+    columns = [
+        {
+            "type": "int(11)",
+            "alias": "project",
+            "table_name": "project",
+            "column_name": "id"
+        },
+        {
+            "type": "varchar(45)",
+            "alias": "project",
+            "table_name": "project",
+            "column_name": "name"
+        },
+        {
+            "type": "int(11)",
+            "alias": "client",
+            "table_name": "client",
+            "column_name": "id"
+        },
+        {
+            "type": "datetime",
+            "alias": "project",
+            "table_name": "project",
+            "column_name": "created_at"
+        },
+        {
+            "type": "varchar(45)",
+            "alias": "client",
+            "table_name": "client",
+            "column_name": "name"
+        },
+        {
+            "referenced_alias": "client",
+            "referenced_column_name": "id",
+            "referenced_table_name": "client",
+            "alias": "project",
+            "table_name": "project",
+            "type": "int(11)",
+            "column_name": "client"
+        }
+    ]
+
+    ret = db_parser.generate_column_description(columns=columns, table=u"project")
+
+    assert ret == [
+        {
+            u"name": u"id",
+            u"type": u"number"
+        },
+        {
+            u"name": u"name",
+            u"type": u"string"
+        },
+        {
+            u"name": u"createdAt",
+            u"type": u"timestamp"
+        },
+        {
+            u"name": u"client",
+            u"type": u"number",
+            u"deduceFrom": {
+                u"source": u"client",
+                u"column": u"id"
+            }
+        }
+    ]
+

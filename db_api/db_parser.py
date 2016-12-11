@@ -5,6 +5,7 @@ import calendar
 import re
 import json
 
+
 class DBParser(object):
 
     def __init__(self, table, columns):
@@ -25,6 +26,43 @@ class DBParser(object):
 
         self._columns = columns
         self._table = table
+
+    def generate_column_description(self, table, columns):
+        types_desc = {
+            u"number": [u"int", u"float"],
+            u"string": [u"varchar", u"text"],
+            u"timestamp": [u"date"]
+        }
+
+        ret = []
+
+        for col in [col for col in columns if col[u"table_name"] == table]:
+
+            matching_type = None
+
+            for key in types_desc:
+                for db_type in types_desc[key]:
+                    if db_type in col.get(u'type'):
+                        matching_type = key
+                        break
+
+            if matching_type is None:
+                raise ValueError(u"No matching types")
+
+            col_desc = {
+                u"name": self.headers_to_json([col.get(u'column_name')])[0],
+                u"type": matching_type
+            }
+
+            if u"referenced_table_name" in col:
+                col_desc[u'deduceFrom'] = {
+                    u"source": col.get(u"referenced_table_name"),
+                    u"column": self.headers_to_json([col.get(u"referenced_column_name")])[0]
+                }
+
+            ret += [col_desc]
+
+        return ret
 
     def json_put(self, item, path, value):
         tab = path.split(u".")
@@ -59,8 +97,6 @@ class DBParser(object):
         return items
 
     def headers_to_json(self, headers):
-
-
         formated_headers = []
         for header in headers:
 

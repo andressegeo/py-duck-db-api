@@ -4,6 +4,7 @@
 from flask import jsonify
 import json
 
+
 class DBFlaskAPI(object):
 
     def __init__(
@@ -26,6 +27,26 @@ class DBFlaskAPI(object):
         )
 
         self.__db_parser_def = db_parser_def
+
+    def handle_description(self, request, table):
+        code = 200
+
+        columns = self.db_connection.get_columns(table)
+
+        db_parser = self.__db_parser_def(
+            table=table,
+            columns=columns
+        )
+
+        result = {
+            u"columns": db_parser.generate_column_description(
+                table=table,
+                columns=columns
+            ),
+            u"table": table
+        }
+
+        return jsonify(result), code
 
     def handle_request(self, request, table):
         result = {}
