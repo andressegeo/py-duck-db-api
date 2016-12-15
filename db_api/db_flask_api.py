@@ -39,7 +39,7 @@ class DBFlaskAPI(object):
         )
 
         result = {
-            u"columns": db_parser.generate_column_description(
+            u"fields": db_parser.generate_column_description(
                 table=table,
                 columns=columns
             ),
