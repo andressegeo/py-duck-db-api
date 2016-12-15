@@ -30,7 +30,7 @@ class DBParser(object):
     def generate_column_description(self, table, columns):
         types_desc = {
             u"number": [u"int", u"float"],
-            u"string": [u"varchar", u"text"],
+            u"text": [u"varchar", u"text"],
             u"timestamp": [u"date"]
         }
 

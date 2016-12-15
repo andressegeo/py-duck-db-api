@@ -434,7 +434,7 @@ def test_generete_description(db_parser):
         },
         {
             u"name": u"name",
-            u"type": u"string"
+            u"type": u"text"
         },
         {
             u"name": u"createdAt",
@@ -449,4 +449,3 @@ def test_generete_description(db_parser):
             }
         }
     ]
-
