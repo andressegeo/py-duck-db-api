@@ -25,5 +25,4 @@ app.register_blueprint(construct_db_api_blueprint(
 ), url_prefix=u'/api')
 
 if __name__ == u"__main__":
-    app.run()
-
+    app.run(debug=True)

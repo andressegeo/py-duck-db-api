@@ -75,7 +75,9 @@ class DBConnection(object):
             column = {
                 u"table_name": table,
                 u"column_name": row[0],
-                u"type": row[1]
+                u"type": row[1],
+                u"key": row[3].lower(),
+                u"extra": row[5].lower()
             }
             if alias is not None:
                 column[u"alias"] = alias
