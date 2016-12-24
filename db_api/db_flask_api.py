@@ -71,11 +71,15 @@ class DBFlaskAPI(object):
 
             items = self.db_connection.select(
                 *dependencies,
-                formater=db_parser.rows_to_formated
+                formater=db_parser.rows_to_formated,
+                first=request.args.get(u"first"),
+                nb=request.args.get(u"nb")
             )
 
             result = {
-                u"items": items
+                u"items": items,
+                u"first": int(request.args.get(u'first', 0)),
+                u"nb": int(request.args.get(u'nb', 100))
             }
 
         elif request.method == u"PUT":

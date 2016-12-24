@@ -99,7 +99,21 @@ class DBConnection(object):
             columns.append(column)
         return columns
 
-    def select(self, fields, table, joins, where=None, formater=None):
+    def select(
+            self,
+            fields,
+            table,
+            joins,
+            where=None,
+            formater=None,
+            first=0,
+            nb=100
+    ):
+        if first is None:
+            first = 0
+        if nb is None:
+            nb = 100
+
         headers = [field.get(u"db") for field in fields]
 
         joins = [
@@ -122,9 +136,12 @@ class DBConnection(object):
         if where is not None and where[u"statements"] != u"":
             query = query + u" WHERE " + where[u"statements"]
 
-        cursor = self._db.cursor()
-        cursor.execute(query, where[u'values'])
+        query += u" LIMIT %s OFFSET %s"
 
+        cursor = self._db.cursor()
+        cursor.execute(query, (where[u'values'] + [int(nb), int(first)]))
+
+        print(query)
         # If formater in parameter
         if formater is not None:
             return formater(

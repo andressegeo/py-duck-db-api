@@ -133,7 +133,6 @@ class DBParser(object):
 
         return db_field
 
-
     def get_columns_with_reference(self):
         return [column for column in self._columns
             if u"referenced_table_name" in column]
