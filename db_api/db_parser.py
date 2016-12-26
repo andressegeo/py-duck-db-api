@@ -19,6 +19,11 @@ class DBParser(object):
             u"$ne": u"!="
         }
 
+        self._STAGES_BINDINGS = {
+            u"$match": self.match,
+            u"$group": self.group
+        }
+        
         self._RECURSIVE_OPERATORS = {
             u"$and": u"AND",
             u"$or": u"OR"
@@ -282,12 +287,15 @@ class DBParser(object):
         alias = table
         if parent_path is not None:
             alias = parent_path[-1]
+            
         fields, joins = [], []
         # For each column which doesn't have any relation
         for col in [col for col in self._columns if col.get(u"alias", col.get(u"table_name")) == alias and u"referenced_table_name" not in col]:
+           
             fields.append({
                 u"db": u"`" + col.get(u"alias") + u"`.`" + col.get(u"column_name") + u"`",
-                u"formated": u".".join(j_tab + [col.get(u"column_name")])
+                u"formated": u".".join(j_tab + [col.get(u"column_name")]),
+                u"alias": u"`" + col.get(u"alias") + u"." + col.get(u"column_name") + u"`"
             })
 
         # For each column which has a relation
@@ -310,7 +318,8 @@ class DBParser(object):
         fields = [
             {
                 u"formated": self.headers_to_json([field.get(u"formated")])[0],
-                u"db": field.get(u"db")
+                u"db": field.get(u"db"),
+                u"alias": field.get(u"alias")
             } for field in fields]
 
 
@@ -322,3 +331,26 @@ class DBParser(object):
             joins,
             self.parse_filters(filters)
         ]
+
+    def group(self, pattern):
+        pass
+
+    def match(self, pattern):
+        pass
+        # fields, table, joins, filters = self.generate_dependencies(filters=pattern)
+        # print(json.dumps(fields, indent=4))
+        # print(json.dumps(joins, indent=4))
+        # print(json.dumps(filters, indent=4))
+        # print(u"________________________________")
+        # return fields, table, joins, filters
+
+    def get_stage(self, stage):
+        for key in stage:
+            if key in self.__stages_binding:
+                 return self.__stages_binding[key](stage)
+
+    def aggregate(self, aggregation):
+        ret = []
+
+        for stage in aggregation:
+            ret.append(self.get_stage(stage))

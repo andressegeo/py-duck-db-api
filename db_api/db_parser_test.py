@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import pytest
+import json
 from db_parser import DBParser
 
 
@@ -376,12 +377,13 @@ def test_parse_insert(db_parser):
 def test_generate_dependencies(db_parser):
 
     ret = db_parser.generate_dependencies()
+    print(json.dumps(ret, indent=4))
     assert len(ret[0]) == 15
     assert ret[1] == u"hour"
     assert len(ret[2]) == 4
 
 
-def test_generete_description(db_parser):
+def test_generate_description(db_parser):
 
     columns = [
         {
@@ -449,3 +451,21 @@ def test_generete_description(db_parser):
             }
         }
     ]
+
+
+def test_link_stages(db_parser):
+
+    stages = []
+
+    # Stage 1
+    stages.append(
+        db_parser.match({})
+    )
+
+    # Stage 2
+    stages.append(
+        db_parser.match({
+                u"project.id": 11
+            }
+        )
+    )
