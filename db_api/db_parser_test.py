@@ -268,6 +268,34 @@ def test_parse_filters(db_parser):
     assert ret[u"values"][0] == 1
 
 
+def test_parse_filters_with_alias(db_parser):
+    ret = db_parser.parse_filters({
+        u"$or": [
+            {
+                u"project.client.id": 1
+            }, {
+                u"$and": [
+                    {
+                        u"startedAt": {
+                            u"$gte": 1477180920
+                        }
+                    }, {
+                        u"affectedTo.email": {
+                            u"$eq": u"klambert@gpartner.eu"
+                        }
+                    }
+                ]
+            }
+        ]
+    }, use_alias=True)
+
+    assert ret[u"statements"] == u"(`client.id` = %s OR (`hour.started_at` >= FROM_UNIXTIME(%s) AND `affected_to.email` = %s))"
+    assert ret[u"values"][0] == 1
+    assert ret[u"values"][1] == 1477180920
+    assert ret[u"values"][2] == u"klambert@gpartner.eu"
+
+
+
 def test_is_field(db_parser):
 
     ret = db_parser.is_field(u"issue")
@@ -376,8 +404,9 @@ def test_parse_insert(db_parser):
 
 def test_generate_dependencies(db_parser):
 
-    ret = db_parser.generate_dependencies()
-    print(json.dumps(ret, indent=4))
+    ret = db_parser.generate_dependencies(filters={
+        u"id": 5
+    })
     assert len(ret[0]) == 15
     assert ret[1] == u"hour"
     assert len(ret[2]) == 4
@@ -451,21 +480,3 @@ def test_generate_description(db_parser):
             }
         }
     ]
-
-
-def test_link_stages(db_parser):
-
-    stages = []
-
-    # Stage 1
-    stages.append(
-        db_parser.match({})
-    )
-
-    # Stage 2
-    stages.append(
-        db_parser.match({
-                u"project.id": 11
-            }
-        )
-    )

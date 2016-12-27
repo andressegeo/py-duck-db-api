@@ -99,6 +99,36 @@ class DBConnection(object):
             columns.append(column)
         return columns
 
+    def _base_query(self, fields, table, joins, use_alias=False):
+        
+        if use_alias:
+            headers = [
+                field.get(u"db") + 
+                u" AS " + 
+                field.get(u"alias")
+                for field in fields
+            ]
+        else:
+            headers = [field.get(u"db") for field in fields]
+        joins = [
+            (
+                u"JOIN `" + ref.get(u"referenced_table_name")
+                + u"` AS `" + ref.get(u"referenced_alias")
+                + u"` ON `"
+                + ref.get(u"alias")
+                + u"`.`" + ref.get(u"column_name") + u"` = `"
+                + ref.get(u"referenced_alias")
+                + u"`.`" + ref.get(u"referenced_column_name") + u"`"
+            )
+            for ref in joins
+        ]
+        query = u"""
+        SELECT """ + u", ".join(headers) + u"""
+        FROM """ + table + u" " + (u" ".join(joins))
+        
+        return headers, query
+
+
     def select(
             self,
             fields,
@@ -114,24 +144,7 @@ class DBConnection(object):
         if nb is None:
             nb = 100
 
-        headers = [field.get(u"db") for field in fields]
-
-        joins = [
-            (
-                u"JOIN `" + ref.get(u"referenced_table_name")
-                + u"` AS `" + ref.get(u"referenced_alias")
-                + u"` ON `"
-                + ref.get(u"alias")
-                + u"`.`" + ref.get(u"column_name") + u"` = `"
-                + ref.get(u"referenced_alias")
-                + u"`.`" + ref.get(u"referenced_column_name") + u"`"
-            )
-            for ref in joins
-        ]
-
-        query = u"""
-        SELECT """ + u", ".join(headers) + u"""
-        FROM """ + table + u" " + (u" ".join(joins))
+        headers, query = self._base_query(fields, table, joins)
 
         if where is not None and where[u"statements"] != u"":
             query = query + u" WHERE " + where[u"statements"]
@@ -141,7 +154,6 @@ class DBConnection(object):
         cursor = self._db.cursor()
         cursor.execute(query, (where[u'values'] + [int(nb), int(first)]))
 
-        print(query)
         # If formater in parameter
         if formater is not None:
             return formater(
@@ -214,6 +226,53 @@ class DBConnection(object):
 
         cursor.connection.commit()
         return count
+
+    def _execute(self, query, values):
+        cursor = self._db.cursor()
+        cursor.execute(query, values)
+        return cursor.fetchall()
+
+    def aggregate(self, base_dependencies, formater, stages=None):
+        stages = stages or []
+        fields, table, joins, _= base_dependencies
+
+        headers, query = self._base_query(fields, table, joins, use_alias=True)
+        
+        values = []
+        # For each stage
+        for index, (stage, value) in enumerate(stages):
+            if stage == u"$match":
+                query = """
+                SELECT * 
+                FROM
+                (
+                    {}
+                )
+                AS s_{}
+                """.format(
+                    query, 
+                    index, 
+                )
+                if len(value.get(u"statements")) > 0:
+                    query += " WHERE {}".format(
+                        value.get(u'statements')
+                    )
+                    values += value.get(u"values", [])
+    
+        cursor = self._db.cursor()
+        cursor.execute(query, values)
+
+        # If formater in parameter
+        if formater is not None:
+            return formater(
+                headers,
+                cursor.fetchall(),
+                fields
+            )
+
+        return headers, cursor.fetchall()
+
+    
 
     def insert(self, insert):
 

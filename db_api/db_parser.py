@@ -120,22 +120,27 @@ class DBParser(object):
 
         return formated_headers
 
-    def formated_to_header(self, json_field, use_referenced=False):
+    def formated_to_header(self, json_field, use_referenced=False, use_alias=False):
         dependencies = self.generate_dependencies()
 
         db_field = None
 
         for field in dependencies[0]:
             if field.get(u"formated") == json_field:
-                db_field = field.get(u"db")
+                if use_alias:
+                    db_field = field.get(u"alias")
+                else:
+                    db_field = field.get(u"db")
                 break
 
         if use_referenced:
             for ref in dependencies[2]:
                 if db_field == (u"`" + ref[u"referenced_alias"] + u"`.`" + ref[u"referenced_column_name"] + u"`"):
-                    db_field = (u"`" + ref[u"table_name"] + u"`.`" + ref[u"column_name"] + u"`")
+                    if use_alias:
+                        db_field = (u"`" + ref[u"table_name"] + u"." + ref[u"column_name"] + u"`")
+                    else:
+                        db_field = (u"`" + ref[u"table_name"] + u"`.`" + ref[u"column_name"] + u"`")
                     break
-
         return db_field
 
     def get_columns_with_reference(self):
@@ -158,7 +163,7 @@ class DBParser(object):
 
         return db_field in valid_columns
 
-    def parse_filters(self, filters, operator=u"AND", parent=None):
+    def parse_filters(self, filters, operator=u"AND", parent=None, use_alias=False):
         filters = filters or {}
 
         if type(filters) is not list:
@@ -173,29 +178,28 @@ class DBParser(object):
             for key in filter:
                 # If key is an operator
                 if self.is_field(key):
-                    db_field = self.formated_to_header(key)
-                    value = self.get_wrapped_values([db_field], [filter[key]])
+                    db_field = self.formated_to_header(key, use_alias=use_alias)
+                    value = self.get_wrapped_values([db_field], [filter[key]], use_alias=use_alias)
                     if type(filter[key]) in [unicode, str, int, float]:
-
                         where[u"statements"].append(db_field + u" = " + value)
                         where[u"values"].append(filter[key])
 
                     elif type(filter[key]) is dict:
 
-                        ret = self.parse_filters(filter[key], parent=key)
+                        ret = self.parse_filters(filter[key], parent=key, use_alias=use_alias)
                         where[u"statements"].append(ret[u"statements"])
                         where[u"values"] += ret[u"values"]
 
                 elif key in self._OPERATORS and parent is not None:
 
-                    db_field = self.formated_to_header(parent)
-                    value = self.get_wrapped_values([db_field], [filter[key]])
+                    db_field = self.formated_to_header(parent, use_alias=use_alias)
+                    value = self.get_wrapped_values([db_field], [filter[key]], use_alias=use_alias)
                     where[u"statements"].append(db_field + u" " + self._OPERATORS[key] + u" " + value)
                     where[u"values"].append(filter[key])
 
                 elif key in self._RECURSIVE_OPERATORS:
 
-                    ret = self.parse_filters(filter[key], self._RECURSIVE_OPERATORS[key], parent=key)
+                    ret = self.parse_filters(filter[key], self._RECURSIVE_OPERATORS[key], parent=key, use_alias=use_alias)
                     where[u"statements"].append(u"(" + ret[u"statements"] + u")")
                     where[u"values"] += ret[u"values"]
 
@@ -244,14 +248,18 @@ class DBParser(object):
 
         return output
 
-    def get_wrapped_values(self, headers, values):
+    def get_wrapped_values(self, headers, values, use_alias=False):
 
         output = []
 
         for index, header in enumerate(headers):
             for column in self._columns:
+                if use_alias:
+                    sep = u"."
+                else:
+                    sep = u"`.`"
 
-                if (u"`" + column.get(u"alias", column.get(u"table_name")) + u"`.`" + column[u"column_name"] + u"`") == header:
+                if (u"`" + column.get(u"alias", column.get(u"table_name")) + sep + column[u"column_name"] + u"`") == header:
 
                     if u"datetime" in column[u"type"] and type(values[index]) in [int, float]:
                         output.append(u"FROM_UNIXTIME(%s)")
@@ -280,7 +288,7 @@ class DBParser(object):
         return insert
 
 
-    def generate_dependencies(self, parent_table=None, parent_path=None, filters=None):
+    def generate_dependencies(self, parent_table=None, parent_path=None, filters=None, use_alias=False):
 
         table = parent_table or self._table
         j_tab = parent_path or []
@@ -329,7 +337,7 @@ class DBParser(object):
             fields,
             self._table,
             joins,
-            self.parse_filters(filters)
+            self.parse_filters(filters, use_alias=use_alias)
         ]
 
     def group(self, pattern):
@@ -337,12 +345,6 @@ class DBParser(object):
 
     def match(self, pattern):
         pass
-        # fields, table, joins, filters = self.generate_dependencies(filters=pattern)
-        # print(json.dumps(fields, indent=4))
-        # print(json.dumps(joins, indent=4))
-        # print(json.dumps(filters, indent=4))
-        # print(u"________________________________")
-        # return fields, table, joins, filters
 
     def get_stage(self, stage):
         for key in stage:

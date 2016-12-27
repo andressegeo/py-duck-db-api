@@ -48,6 +48,35 @@ class DBFlaskAPI(object):
 
         return jsonify(result), code
 
+    def handle_aggregation(self, request, table):
+        result = {}
+
+        code = 200
+        db_parser = self.__db_parser_def(
+            table=table,
+            columns=self.db_connection.get_columns(table)
+        )
+
+        pipeline = json.loads(request.args.get(u'pipeline', []))
+        base_dependencies = db_parser.generate_dependencies()
+        stages = []
+        for stage in pipeline:
+            if u"$match" in stage:
+                stages.append(
+                    (u"$match", db_parser.parse_filters(stage.get(u"$match", {}), use_alias=True))
+                )
+            
+        items = self.db_connection.aggregate(
+            base_dependencies, 
+            formater=db_parser.rows_to_formated,
+            stages=stages
+        )
+
+        result[u'items'] = items
+
+        return jsonify(result), code
+
+
     def handle_request(self, request, table):
         result = {}
 
