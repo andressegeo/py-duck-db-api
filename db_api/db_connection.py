@@ -122,12 +122,9 @@ class DBConnection(object):
             )
             for ref in joins
         ]
-        query = u"""
-        SELECT """ + u", ".join(headers) + u"""
-        FROM """ + table + u" " + (u" ".join(joins))
+        query = u"SELECT " + u", ".join(headers) + u" FROM " + table + u" " + (u" ".join(joins))
         
         return headers, query
-
 
     def select(
             self,
@@ -184,7 +181,6 @@ class DBConnection(object):
 
         query = u"""UPDATE """ + table + u" " + joins + u""" """ + update[u"statements"] + where[u"statements"]
 
-
         cursor = self._db.cursor()
 
         cursor.execute(u"SELECT COUNT(*) FROM " + table + u" " + joins + u" " + where[u"statements"], where[u"values"])
@@ -196,7 +192,12 @@ class DBConnection(object):
         return count
 
     def delete(self, table, joins, where):
-
+        """
+        :param table: The table concerned by this method.
+        :param joins: The list of table to join with SQL (SQL agnostic parameter).
+        :param where: The where clause to apply to the Delete
+        :return: The deleted lines count
+        """
         if where[u"statements"] != u"":
             where[u"statements"] = u"WHERE " + where[u"statements"]
 
@@ -213,28 +214,40 @@ class DBConnection(object):
             for ref in joins
         ])
 
-        query = u"""
-        DELETE """ + table + u" FROM " + table + u" " + joins + u""" """ + where[u"statements"]
+        # Determine how many lines are going to be deleted
+        ret = self._execute(
+            query=u"SELECT COUNT(*) FROM " + table + u" " + joins + u" " + where[u"statements"], 
+            values=where[u"values"]
+        )
+        count = ret[0][0]
 
-        cursor = self._db.cursor()
+        # Execute the final query
+        self._execute(
+            query=u"""DELETE """ + table + u" FROM " + table + u" " + joins + u""" """ + where[u"statements"],
+            values=where[u'values']
+        )
 
-        cursor.execute(u"SELECT COUNT(*) FROM " + table + u" " + joins + u" " + where[u"statements"], where[u"values"])
-        count = cursor.fetchall()[0][0]
-
-
-        cursor.execute(query, where[u"values"])
-
-        cursor.connection.commit()
         return count
 
-    def _execute(self, query, values):
+    def _execute(self, query, values, do_commit=True):
+        """
+        :type query: string
+        :param query: The SQL query to execute
+        :type values: List
+        :param values: The values to sanitize & pass to the query to replace the "%s" values.
+        :type do_commit: Bool
+        :param do_commit: If the value has to be saved immediately, or can allow a rollback.
+        :return:
+        """
         cursor = self._db.cursor()
         cursor.execute(query, values)
+        if do_commit:
+            cursor.connection.commit()
         return cursor.fetchall()
 
     def aggregate(self, base_dependencies, formater, stages=None):
         stages = stages or []
-        fields, table, joins, _= base_dependencies
+        fields, table, joins, _ = base_dependencies
 
         headers, query = self._base_query(fields, table, joins, use_alias=True)
         
@@ -242,14 +255,7 @@ class DBConnection(object):
         # For each stage
         for index, (stage, value) in enumerate(stages):
             if stage == u"$match":
-                query = """
-                SELECT * 
-                FROM
-                (
-                    {}
-                )
-                AS s_{}
-                """.format(
+                query = "SELECT * FROM ( {} ) AS s_{}".format(
                     query, 
                     index, 
                 )
@@ -258,21 +264,20 @@ class DBConnection(object):
                         value.get(u'statements')
                     )
                     values += value.get(u"values", [])
-    
-        cursor = self._db.cursor()
-        cursor.execute(query, values)
+            elif stage == u"project":
+                pass
+
+        values = self._execute(query, values)
 
         # If formater in parameter
         if formater is not None:
             return formater(
                 headers,
-                cursor.fetchall(),
+                values,
                 fields
             )
 
-        return headers, cursor.fetchall()
-
-    
+        return headers, values
 
     def insert(self, insert):
 

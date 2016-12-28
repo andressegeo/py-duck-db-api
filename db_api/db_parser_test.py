@@ -480,3 +480,42 @@ def test_generate_description(db_parser):
             }
         }
     ]
+
+
+def test_parse_project(db_parser):
+
+    ret = db_parser.parse_project(project={
+        u"id": 1,
+        u"issue_formated": u"$issue",
+        u"user_email": u"$affectedTo.email"
+    })
+
+    print(json.dumps(ret, indent=4))
+    assert ret[u"statements"] == u"`hour.issue` AS %s, `hour.id`, `affected_to.email` AS %s"
+    assert ret[u'values'] == [u"issue_formated", u"user_email"]
+
+
+def test_parse_filter_with_custom_dependencies(db_parser):
+    ret = db_parser.parse_filters({
+        u"issue": u"test"
+    }, dependencies=(
+        [
+            {
+                "alias": "issue_formated",
+                "db_field": "issue_formated"
+            },
+            {
+                "alias": "hour.id",
+                "db_field": "hour.id"
+            },
+            {
+                "alias": "user_email",
+                "db_field": "user_email"
+            }
+        ],
+        "",
+        [],
+        []
+        )
+    )
+    print(json.dumps(ret, indent=4))

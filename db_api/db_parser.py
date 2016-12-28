@@ -120,8 +120,9 @@ class DBParser(object):
 
         return formated_headers
 
-    def formated_to_header(self, json_field, use_referenced=False, use_alias=False):
-        dependencies = self.generate_dependencies()
+    def formated_to_header(self, json_field, use_referenced=False, use_alias=False, dependencies=None):
+        if dependencies is None:
+            dependencies = self.generate_dependencies()
 
         db_field = None
 
@@ -163,7 +164,37 @@ class DBParser(object):
 
         return db_field in valid_columns
 
-    def parse_filters(self, filters, operator=u"AND", parent=None, use_alias=False):
+    def parse_project(self, project, dependencies=None):
+        ret = {
+            u"statements": [],
+            u"values": [],
+            u"dependencies": ([], u"", [], [])  # Dependencies for potential next stage
+        }
+
+        for key in project:
+            if project[key] == 1:
+                db_field = self.formated_to_header(key, use_alias=True, dependencies=dependencies)
+                ret[u'statements'].append(db_field)
+                ret[u'dependencies'][0].append({
+                    u"alias": db_field[1:-1],
+                    u"db_field": db_field[1:-1]
+                })
+            elif type(project[key]) is unicode and u"$" in project[key]:
+                db_field = self.formated_to_header(project[key][1:], use_alias=True, dependencies=dependencies)
+                ret[u'statements'].append(u"{} AS %s".format(db_field))
+                ret[u'values'].append(key)
+                ret[u'dependencies'][0].append({
+                    u"alias": key,
+                    u"db_field": key
+                })
+            else:
+                pass
+
+        ret[u'statements'] = u", ".join(ret[u'statements'])
+        return ret
+
+
+    def parse_filters(self, filters, operator=u"AND", parent=None, use_alias=False, dependencies=None):
         filters = filters or {}
 
         if type(filters) is not list:
@@ -178,7 +209,7 @@ class DBParser(object):
             for key in filter:
                 # If key is an operator
                 if self.is_field(key):
-                    db_field = self.formated_to_header(key, use_alias=use_alias)
+                    db_field = self.formated_to_header(key, use_alias=use_alias, dependencies=dependencies)
                     value = self.get_wrapped_values([db_field], [filter[key]], use_alias=use_alias)
                     if type(filter[key]) in [unicode, str, int, float]:
                         where[u"statements"].append(db_field + u" = " + value)
@@ -186,20 +217,26 @@ class DBParser(object):
 
                     elif type(filter[key]) is dict:
 
-                        ret = self.parse_filters(filter[key], parent=key, use_alias=use_alias)
+                        ret = self.parse_filters(filter[key], parent=key, use_alias=use_alias, dependencies=dependencies)
                         where[u"statements"].append(ret[u"statements"])
                         where[u"values"] += ret[u"values"]
 
                 elif key in self._OPERATORS and parent is not None:
 
-                    db_field = self.formated_to_header(parent, use_alias=use_alias)
+                    db_field = self.formated_to_header(parent, use_alias=use_alias, dependencies=dependencies)
                     value = self.get_wrapped_values([db_field], [filter[key]], use_alias=use_alias)
                     where[u"statements"].append(db_field + u" " + self._OPERATORS[key] + u" " + value)
                     where[u"values"].append(filter[key])
 
                 elif key in self._RECURSIVE_OPERATORS:
 
-                    ret = self.parse_filters(filter[key], self._RECURSIVE_OPERATORS[key], parent=key, use_alias=use_alias)
+                    ret = self.parse_filters(
+                        filter[key],
+                        self._RECURSIVE_OPERATORS[key],
+                        parent=key,
+                        use_alias=use_alias,
+                        dependencies=dependencies
+                    )
                     where[u"statements"].append(u"(" + ret[u"statements"] + u")")
                     where[u"values"] += ret[u"values"]
 
