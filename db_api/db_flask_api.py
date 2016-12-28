@@ -60,15 +60,35 @@ class DBFlaskAPI(object):
         pipeline = json.loads(request.args.get(u'pipeline', []))
         base_dependencies = db_parser.generate_dependencies()
         stages = []
+        custom_dependencies = None
         for stage in pipeline:
             if u"$match" in stage:
                 stages.append(
-                    (u"$match", db_parser.parse_filters(stage.get(u"$match", {}), use_alias=True))
+                    (
+                        u"$match", db_parser.parse_filters(
+                            stage.get(u"$match", {}),
+                            use_alias=True,
+                            is_formated=custom_dependencies is None,
+                            dependencies=custom_dependencies
+                        )
+                    )
                 )
-            
+            elif u"$project" in stage:
+                ret = db_parser.parse_project(
+                    stage.get(u"$project"),
+                    dependencies=custom_dependencies
+                )
+                stages.append(
+                    (u"$project", ret)
+                )
+                custom_dependencies = ret[u'dependencies']
+
+        def formater(headers, rows, fields):
+            return db_parser.rows_to_formated(headers, rows, fields, is_formated=custom_dependencies is None)
+
         items = self.db_connection.aggregate(
             base_dependencies, 
-            formater=db_parser.rows_to_formated,
+            formater=formater,
             stages=stages
         )
 

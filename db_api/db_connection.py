@@ -250,7 +250,7 @@ class DBConnection(object):
         fields, table, joins, _ = base_dependencies
 
         headers, query = self._base_query(fields, table, joins, use_alias=True)
-        
+
         values = []
         # For each stage
         for index, (stage, value) in enumerate(stages):
@@ -264,8 +264,15 @@ class DBConnection(object):
                         value.get(u'statements')
                     )
                     values += value.get(u"values", [])
-            elif stage == u"project":
-                pass
+            elif stage == u"$project":
+                fields = value.get(u"dependencies")[0]
+                headers = [item.get(u"alias") for item in fields]
+                query = "SELECT {} FROM ( {} ) AS s_{}".format(
+                    value.get(u"statements"),
+                    query,
+                    index,
+                )
+                values = value.get(u"values") + values
 
         values = self._execute(query, values)
 
