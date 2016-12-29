@@ -173,6 +173,8 @@ def test_to_one_level_json(db_parser):
 
 
 def test_get_wrapped_values(db_parser):
+    base_state = db_parser.generate_base_state()
+    db_parser._last_state = base_state
     wrapped_values = db_parser.get_wrapped_values(headers=[
             u"`hour`.`issue`",
             u"`hour`.`id`",
@@ -186,90 +188,103 @@ def test_get_wrapped_values(db_parser):
     )
     assert wrapped_values == u"%s, %s, FROM_UNIXTIME(%s)"
 
+    dummy_state = {
+        u"fields": [
+            {
+                u"alias": u"issue",
+            }
+        ],
+        u"type": u"project"
+    }
+    db_parser._last_state = dummy_state
 
     wrapped_values = db_parser.get_wrapped_values(headers=[
-        u"`hour`.`issue`",
-        u"`hour`.`id`",
-        u"`hour`.`started_at`"
+        u"issue"
     ],
         values=[
-            u"test",
-            u"test",
-            u"2016-10-09"
+            u"test"
         ]
     )
 
-    assert wrapped_values == u"%s, %s, %s"
+    assert wrapped_values == u"%s"
 
 
-def test_parse_filters(db_parser):
-    ret = db_parser.parse_filters({
-        u"issue": u"test"
-    })
+def test_parse_match(db_parser):
+    base_state = db_parser.generate_base_state()
+    ret = db_parser.parse_match({
+            u"issue": u"test"
+        },
+        from_state=base_state
+    )
 
-    assert ret[u"statements"] == u"`hour`.`issue` = %s"
+    assert ret[u"statements"] == u"`hour.issue` = %s"
     assert ret[u"values"][0] == u"test"
 
-    ret = db_parser.parse_filters({
-        u"issue": {
-            u"$eq": u"test",
-            u"$gte": u"test"
-        }
-    })
-
-    assert ret[u"statements"] == u"`hour`.`issue` = %s AND `hour`.`issue` >= %s"
-    assert ret[u"values"][0] == u"test"
-
-    ret = db_parser.parse_filters({
-        u"$or": [
-            {
-                u"issue": u"val 1"
-            }, {
-                u"issue": u"val 2"
+    ret = db_parser.parse_match({
+            u"issue": {
+                u"$eq": u"test",
+                u"$gte": u"test"
             }
-        ]
-    })
+        },
+        from_state=base_state)
 
-    assert ret[u"statements"] == u"(`hour`.`issue` = %s OR `hour`.`issue` = %s)"
+    assert ret[u"statements"] == u"`hour.issue` = %s AND `hour.issue` >= %s"
+    assert ret[u"values"][0] == u"test"
+
+    ret = db_parser.parse_match({
+            u"$or": [
+                {
+                    u"issue": u"val 1"
+                }, {
+                    u"issue": u"val 2"
+                }
+            ]
+        },
+        from_state=base_state)
+
+    assert ret[u"statements"] == u"(`hour.issue` = %s OR `hour.issue` = %s)"
     assert ret[u"values"][0] == u"val 1"
     assert ret[u"values"][1] == u"val 2"
 
-    ret = db_parser.parse_filters({
-        u"$or": [
-            {
-                u"project.client.id": 1
-            }, {
-                u"$and": [
-                    {
-                        u"startedAt": {
-                            u"$gte": 1477180920
+    ret = db_parser.parse_match({
+            u"$or": [
+                {
+                    u"project.client.id": 1
+                }, {
+                    u"$and": [
+                        {
+                            u"started_at": {
+                                u"$gte": 1477180920
+                            }
+                        }, {
+                            u"affected_to.email": {
+                                u"$eq": u"klambert@gpartner.eu"
+                            }
                         }
-                    }, {
-                        u"affectedTo.email": {
-                            u"$eq": u"klambert@gpartner.eu"
-                        }
-                    }
-                ]
-            }
-        ]
-    })
+                    ]
+                }
+            ]
+        },
+        from_state=base_state)
 
-    assert ret[u"statements"] == u"(`client`.`id` = %s OR (`hour`.`started_at` >= FROM_UNIXTIME(%s) AND `affected_to`.`email` = %s))"
+    assert ret[u"statements"] == u"(`client.id` = %s OR (`hour.started_at` >= FROM_UNIXTIME(%s) AND `affected_to.email` = %s))"
     assert ret[u"values"][0] == 1
     assert ret[u"values"][1] == 1477180920
     assert ret[u"values"][2] == u"klambert@gpartner.eu"
 
 
-    ret = db_parser.parse_filters({
-        u"affectedTo.id": 1
-    })
+    ret = db_parser.parse_match({
+            u"affected_to.id": 1
+        },
+        from_state=base_state
+    )
 
-    assert ret[u"statements"] == u"`affected_to`.`id` = %s"
+    assert ret[u"statements"] == u"`affected_to.id` = %s"
     assert ret[u"values"][0] == 1
 
 
 def test_parse_filters_with_alias(db_parser):
-    ret = db_parser.parse_filters({
+    ret = db_parser.parse_match({
         u"$or": [
             {
                 u"project.client.id": 1
@@ -297,17 +312,18 @@ def test_parse_filters_with_alias(db_parser):
 
 
 def test_is_field(db_parser):
-
+    base_state = db_parser.generate_base_state()
+    db_parser._last_state = base_state
     ret = db_parser.is_field(u"issue")
     assert ret is True
 
     ret = db_parser.is_field(u"badField")
     assert ret is False
 
-    ret = db_parser.is_field(u"affectedTo.email")
+    ret = db_parser.is_field(u"affected_to.email")
     assert ret is True
 
-    ret = db_parser.is_field(u"startedAt")
+    ret = db_parser.is_field(u"started_at")
     assert ret is True
 
 
@@ -403,13 +419,9 @@ def test_parse_insert(db_parser):
 
 
 def test_generate_dependencies(db_parser):
-
-    ret = db_parser.generate_dependencies(filters={
-        u"id": 5
-    })
-    assert len(ret[0]) == 15
-    assert ret[1] == u"hour"
-    assert len(ret[2]) == 4
+    ret = db_parser.generate_base_state()
+    for field in [u"fields", u"table", u"joins"]:
+        assert field in ret
 
 
 def test_generate_description(db_parser):
@@ -468,7 +480,7 @@ def test_generate_description(db_parser):
             u"type": u"text"
         },
         {
-            u"name": u"createdAt",
+            u"name": u"created_at",
             u"type": u"timestamp"
         },
         {
@@ -495,14 +507,14 @@ def test_parse_project(db_parser):
 
 
 def test_parse_filter_with_custom_dependencies(db_parser):
-    ret = db_parser.parse_filters({
+    ret = db_parser.parse_match({
             u"$or": [
                 {u"hour.id": 5},
                 {u"issue_formated": u"test2"}
             ]
         },
         is_formated=False,
-        dependencies=(
+        from_state=(
             [
                 {
                     "alias": "issue_formated",

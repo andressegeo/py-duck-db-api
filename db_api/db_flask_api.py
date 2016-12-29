@@ -58,18 +58,18 @@ class DBFlaskAPI(object):
         )
 
         pipeline = json.loads(request.args.get(u'pipeline', []))
-        base_dependencies = db_parser.generate_dependencies()
+        base_dependencies = db_parser.generate_base_state()
         stages = []
         custom_dependencies = None
         for stage in pipeline:
             if u"$match" in stage:
                 stages.append(
                     (
-                        u"$match", db_parser.parse_filters(
+                        u"$match", db_parser.parse_match(
                             stage.get(u"$match", {}),
                             use_alias=True,
                             is_formated=custom_dependencies is None,
-                            dependencies=custom_dependencies
+                            from_state=custom_dependencies
                         )
                     )
                 )
@@ -115,11 +115,16 @@ class DBFlaskAPI(object):
         if data is not None and data != u"":
             data = json.loads(data, encoding=u"utf-8")
 
-        dependencies = db_parser.generate_dependencies(filters=filters)
+        base_state = db_parser.generate_base_state()
+        match_state = db_parser.parse_match(match=filters, from_state=base_state)
+
         if request.method == u"GET":
 
             items = self.db_connection.select(
-                *dependencies,
+                fields=base_state.get(u"fields"),
+                table=table,
+                joins=base_state.get(u"joins"),
+                where=match_state,
                 formater=db_parser.rows_to_formated,
                 first=request.args.get(u"first"),
                 nb=request.args.get(u"nb")

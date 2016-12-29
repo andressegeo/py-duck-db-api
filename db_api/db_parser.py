@@ -29,11 +29,69 @@ class DBParser(object):
             u"$or": u"OR"
         }
 
-        self._columns = columns
+        self._base_columns = columns
         self._table = table
+        self._last_state = None
+
+    def generate_base_state(self, parent_table=None, parent_path=None):
+        """
+        This method generate a set of variables, that can be seen as dependencies, used by others function
+        to construct the base state of the queries allowed to be applied to the selected table.
+        The return value is a dict, that can contains anything relevant (a state). In the case of this method,
+        It always contains fields, joins, to construct a simple get request to a table and his relations.
+        :param parent_table:
+        :param parent_path:
+        :param set_last_state: Keep in the attribute _last_state.
+        :return: dict
+        """
+        table = parent_table or self._table
+        j_tab = parent_path or []
+        alias = table
+        if parent_path is not None:
+            alias = parent_path[-1]
+
+        fields, joins = [], []
+        # For each column which doesn't have any relation
+        for col in [col for col in self._base_columns if
+                    col.get(u"alias", col.get(u"table_name")) == alias and u"referenced_table_name" not in col]:
+            fields.append({
+                u"db": u"`" + col.get(u"alias") + u"`.`" + col.get(u"column_name") + u"`",
+                u"formated": u".".join(j_tab + [col.get(u"column_name")]),
+                u"alias": col.get(u"alias") + u"." + col.get(u"column_name")
+            })
+
+        # For each column which has a relation
+        for ref_col in [
+            col for col in self._base_columns
+            if (u"referenced_table_name" in col and col.get(u"table_name") == table)
+            ]:
+            new_parent_path = j_tab + [ref_col.get(u"referenced_alias")]
+            joins += [ref_col]
+
+            ret = self.generate_base_state(
+                parent_table=ref_col.get(u"referenced_table_name"),
+                parent_path=new_parent_path
+            )
+            fields += ret.get(u"fields")
+            joins += ret.get(u"joins")
+
+        # Then format JSON
+        fields = [
+            {
+                u"formated": field.get(u"formated"),
+                u"db": field.get(u"db"),
+                u"alias": field.get(u"alias")
+            } for field in fields]
+
+        base_state = {
+            u"fields": fields,
+            u"joins": joins,
+            u"type": u"base"
+        }
+        # Return
+        return base_state
 
     def generate_column_description(self, table, columns):
-
         types_desc = {
             u"number": [u"int", u"float"],
             u"text": [u"varchar", u"text"],
@@ -56,7 +114,7 @@ class DBParser(object):
                 raise ValueError(u"No matching types")
 
             col_desc = {
-                u"name": self.headers_to_json([col.get(u'column_name')])[0],
+                u"name": col.get(u'column_name'),
                 u"type": matching_type
             }
 
@@ -69,7 +127,7 @@ class DBParser(object):
             if u"referenced_table_name" in col:
                 col_desc[u'deduceFrom'] = {
                     u"source": col.get(u"referenced_table_name"),
-                    u"column": self.headers_to_json([col.get(u"referenced_column_name")])[0]
+                    u"column": [col.get(u"referenced_column_name")][0]
                 }
 
             ret += [col_desc]
@@ -102,7 +160,6 @@ class DBParser(object):
         for row in rows:
             item = {}
             for index, cell in enumerate(row):
-                print(fields[index])
                 key = u"alias"
                 if is_formated:
                     key = u"formated"
@@ -124,14 +181,22 @@ class DBParser(object):
 
         return formated_headers
 
-    def formated_to_header(self, json_field, use_referenced=False, use_alias=False, dependencies=None):
-
-        if dependencies is None:
-            dependencies = self.generate_dependencies()
+    def formated_to_header(self, json_field, use_referenced=False, use_alias=False, from_state=None):
+        """
+        Format a JSON field given in parameter, when calling the web service attached for example.
+        It will format the field in a database friendly string, and try to find it in
+        :param json_field:
+        :param use_referenced:
+        :param use_alias:
+        :param from_state:
+        :return:
+        """
+        if from_state is None:
+            from_state = self.generate_base_state()
 
         db_field = None
 
-        for field in dependencies[0]:
+        for field in from_state.get(u"fields"):
             if field.get(u"formated") == json_field:
                 if use_alias:
                     db_field = field.get(u"alias")
@@ -140,7 +205,7 @@ class DBParser(object):
                 break
 
         if use_referenced:
-            for ref in dependencies[2]:
+            for ref in from_state.get(u"joins", []):
                 if db_field == (u"`" + ref[u"referenced_alias"] + u"`.`" + ref[u"referenced_column_name"] + u"`"):
                     if use_alias:
                         db_field = (u"`" + ref[u"table_name"] + u"." + ref[u"column_name"] + u"`")
@@ -150,32 +215,90 @@ class DBParser(object):
         return db_field
 
     def get_columns_with_reference(self):
-        return [column for column in self._columns
+        return [column for column in self._base_columns
             if u"referenced_table_name" in column]
 
-    def is_field(self, key, dependencies=None, is_formated=True):
+    def find_field(self, key):
+        for field in self._last_state.get(u"fields", []):
+            if key == field.get(u"formated", u""):
+                return field.get(u"alias")
 
-        if is_formated:
-            db_field = self.formated_to_header(key, dependencies=dependencies)
-        else:
-            db_field = key
+            for variable in [key, self._table + u"." + key]:
+                is_field = (u"`" + variable + u"`" == field.get(u"alias"))
 
-        valid_columns = []
+                if is_field:
+                    return field.get(u"alias")
 
-        if dependencies is None:
-            for column in self._columns:
-                valid_columns.append(u"`" + column[u"alias"]
-                    + u"`.`" + column[u"column_name"] + u"`"
-                )
-                if u"referenced_table_name" in column:
-                    valid_columns.append(u"`" + column[u"alias"] +
-                                         u"`.`" + column[u"referenced_column_name"] + u"`"
+        return None
+
+    def parse_match(
+            self,
+            match,
+            from_state,
+            operator=u"AND",
+            parent=None,
+    ):
+        self._last_state = from_state
+
+        match = match or {}
+
+        if type(match) is not list:
+            match = [match]
+
+        where = {
+            u"statements": [],
+            u"values": []
+        }
+
+        for filter in match:
+
+            for key in filter:
+                # If key is an operator
+                if self.is_field(key):
+                    db_field = self.find_field(key)
+                    value = self.get_wrapped_values(
+                        [db_field],
+                        [filter[key]]
                     )
-        else:
+                    if type(filter[key]) in [unicode, str, int, float]:
+                        where[u"statements"].append(u"`" + db_field + u"`" + u" = " + value)
+                        where[u"values"].append(filter[key])
 
-            return db_field in [item[u'alias'] for item in dependencies[0]]
+                    elif type(filter[key]) is dict:
 
-        return db_field in valid_columns
+                        ret = self.parse_match(filter[key], parent=key, from_state=from_state)
+                        where[u"statements"].append(ret[u"statements"])
+                        where[u"values"] += ret[u"values"]
+
+                elif key in self._OPERATORS and parent is not None:
+
+                    db_field = self.find_field(parent)
+                    value = self.get_wrapped_values(
+                        [db_field],
+                        [filter[key]]
+                    )
+                    where[u"statements"].append(u"`" + db_field + u"`" + u" " + self._OPERATORS[key] + u" " + value)
+                    where[u"values"].append(filter[key])
+
+                elif key in self._RECURSIVE_OPERATORS:
+
+
+                    ret = self.parse_match(
+                        filter[key],
+                        from_state=from_state,
+                        operator=self._RECURSIVE_OPERATORS[key],
+                        parent=key
+                    )
+
+                    where[u"statements"].append(u"(" + ret[u"statements"] + u")")
+                    where[u"values"] += ret[u"values"]
+
+        where[u"statements"] = (u" " + operator + u" ").join(where[u"statements"])
+
+        return where
+
+    def is_field(self, key):
+        return self.find_field(key) is not None
 
     def parse_project(self, project, dependencies=None):
         ret = {
@@ -186,14 +309,14 @@ class DBParser(object):
 
         for key in project:
             if project[key] == 1:
-                db_field = self.formated_to_header(key, use_alias=True, dependencies=dependencies)
+                db_field = self.formated_to_header(key, use_alias=True, from_state=dependencies)
                 ret[u'statements'].append(db_field)
                 ret[u'dependencies'][0].append({
                     u"alias": db_field[1:-1],
                     u"db_field": db_field[1:-1]
                 })
             elif type(project[key]) is unicode and u"$" in project[key]:
-                db_field = self.formated_to_header(project[key][1:], use_alias=True, dependencies=dependencies)
+                db_field = self.formated_to_header(project[key][1:], use_alias=True, from_state=dependencies)
                 ret[u'statements'].append(u"{} AS %s".format(db_field))
                 ret[u'values'].append(key)
                 ret[u'dependencies'][0].append({
@@ -206,84 +329,12 @@ class DBParser(object):
         ret[u'statements'] = u", ".join(ret[u'statements'])
         return ret
 
-    def parse_filters(
-            self,
-            filters,
-            operator=u"AND",
-            parent=None,
-            use_alias=False,
-            dependencies=None,
-            is_formated=True
-    ):
-
-        filters = filters or {}
-
-        if type(filters) is not list:
-            filters = [filters]
-
-        where = {
-            u"statements": [],
-            u"values": []
-        }
-
-        for filter in filters:
-            for key in filter:
-                # If key is an operator
-                if self.is_field(key, dependencies=dependencies, is_formated=is_formated):
-                    if is_formated:
-                        db_field = self.formated_to_header(key, use_alias=use_alias, dependencies=dependencies)
-                    else:
-                        db_field = key
+    def to_db_field_selector(self, field):
+        if u"." not in field:
+            field = self._table + u"." + field
+        return u"`" + field + u"`"
 
 
-                    value = self.get_wrapped_values(
-                        [db_field],
-                        [filter[key]],
-                        use_alias=use_alias,
-                        is_formated=is_formated,
-                        dependencies=dependencies
-                    )
-                    if type(filter[key]) in [unicode, str, int, float]:
-                        where[u"statements"].append(db_field + u" = " + value)
-                        where[u"values"].append(filter[key])
-
-                    elif type(filter[key]) is dict:
-
-                        ret = self.parse_filters(filter[key], parent=key, use_alias=use_alias, dependencies=dependencies)
-                        where[u"statements"].append(ret[u"statements"])
-                        where[u"values"] += ret[u"values"]
-
-                elif key in self._OPERATORS and parent is not None:
-                    if is_formated:
-                        db_field = self.formated_to_header(parent, use_alias=use_alias, dependencies=dependencies)
-                    else:
-                        db_field = key
-                    value = self.get_wrapped_values(
-                        [db_field],
-                        [filter[key]],
-                        use_alias=use_alias,
-                        is_formated=is_formated,
-                        dependencies=dependencies
-                    )
-                    where[u"statements"].append(db_field + u" " + self._OPERATORS[key] + u" " + value)
-                    where[u"values"].append(filter[key])
-
-                elif key in self._RECURSIVE_OPERATORS:
-
-                    ret = self.parse_filters(
-                        filter[key],
-                        self._RECURSIVE_OPERATORS[key],
-                        parent=key,
-                        use_alias=use_alias,
-                        dependencies=dependencies,
-                        is_formated=is_formated
-                    )
-                    where[u"statements"].append(u"(" + ret[u"statements"] + u")")
-                    where[u"values"] += ret[u"values"]
-
-        where[u"statements"] = (u" " + operator + u" ").join(where[u"statements"])
-
-        return where
 
     def parse_update(self, data):
         update = {
@@ -326,33 +377,30 @@ class DBParser(object):
 
         return output
 
-    def get_wrapped_values(self, headers, values, use_alias=False, dependencies=None, is_formated=True):
+    def get_wrapped_values(self, headers, values):
 
         output = []
 
         for index, header in enumerate(headers):
-            columns = self._columns
-            if dependencies is not None:
-                columns = dependencies[0]
-
-            for column in columns:
-                if use_alias:
-                    sep = u"."
-                else:
-                    sep = u"`.`"
-
-                cond = (column.get(u"alias") == header)
-                if is_formated:
-                    cond = ((u"`" + column.get(u"alias", column.get(u"table_name")) + sep + column[
-                        u"column_name"] + u"`") == header)
-                if cond:
-
-                    if u"datetime" in column.get(u"type", u"") and type(values[index]) in [int, float]:
-                        output.append(u"FROM_UNIXTIME(%s)")
-                    else:
+            if self._last_state is not None and self._last_state.get(u"type", u"") != u"base":
+                columns = self._last_state.get(u"fields", [])
+                for column in columns:
+                    if header == column.get(u"alias"):
                         output.append(u"%s")
+                        break
+            else:
+                # If no base state, parse from columns
+                for column in self._base_columns:
 
-                    break
+                    sep = u"."
+                    if ((column.get(u"alias", column.get(u"table_name")) + sep + column[u"column_name"])
+                            == header):
+
+                        if u"datetime" in column.get(u"type", u"") and type(values[index]) in [int, float]:
+                            output.append(u"FROM_UNIXTIME(%s)")
+                        else:
+                            output.append(u"%s")
+                        break
         return u", ".join(output)
 
     def parse_insert(self, data):
@@ -374,57 +422,7 @@ class DBParser(object):
         return insert
 
 
-    def generate_dependencies(self, parent_table=None, parent_path=None, filters=None, use_alias=False):
 
-        table = parent_table or self._table
-        j_tab = parent_path or []
-        alias = table
-        if parent_path is not None:
-            alias = parent_path[-1]
-            
-        fields, joins = [], []
-        # For each column which doesn't have any relation
-        for col in [col for col in self._columns if col.get(u"alias", col.get(u"table_name")) == alias and u"referenced_table_name" not in col]:
-           
-            fields.append({
-                u"db": u"`" + col.get(u"alias") + u"`.`" + col.get(u"column_name") + u"`",
-                u"formated": u".".join(j_tab + [col.get(u"column_name")]),
-                u"alias": u"`" + col.get(u"alias") + u"." + col.get(u"column_name") + u"`"
-            })
-
-        # For each column which has a relation
-        for ref_col in [
-            col for col in self._columns
-            if (u"referenced_table_name" in col and col.get(u"table_name") == table)
-        ]:
-            new_parent_path = j_tab + [ref_col.get(u"referenced_alias")]
-            joins += [ref_col]
-
-            ret = self.generate_dependencies(
-                parent_table=ref_col.get(u"referenced_table_name"),
-                parent_path=new_parent_path
-            )
-            fields += ret[0]
-            joins += ret[2]
-
-
-        # Then format JSON
-        fields = [
-            {
-                u"formated": self.headers_to_json([field.get(u"formated")])[0],
-                u"db": field.get(u"db"),
-                u"alias": field.get(u"alias")
-            } for field in fields]
-
-
-
-        # Return
-        return [
-            fields,
-            self._table,
-            joins,
-            self.parse_filters(filters, use_alias=use_alias)
-        ]
 
     def group(self, pattern):
         pass
