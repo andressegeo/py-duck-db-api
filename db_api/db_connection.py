@@ -99,17 +99,16 @@ class DBConnection(object):
             columns.append(column)
         return columns
 
-    def _base_query(self, fields, table, joins, use_alias=False):
+    def _base_query(self, fields, table, joins):
         
-        if use_alias:
-            headers = [
-                field.get(u"db") + 
-                u" AS " + 
-                field.get(u"alias")
-                for field in fields
-            ]
-        else:
-            headers = [field.get(u"db") for field in fields]
+
+        headers = [
+            field.get(u"db") +
+            u" AS `" +
+            field.get(u"alias") + u"`"
+            for field in fields
+        ]
+
         joins = [
             (
                 u"JOIN `" + ref.get(u"referenced_table_name")
@@ -144,7 +143,7 @@ class DBConnection(object):
         headers, query = self._base_query(fields, table, joins)
 
         if where is not None and where[u"statements"] != u"":
-            query = query + u" WHERE " + where[u"statements"]
+            query = u"SELECT * FROM (" + query + u") AS s_0 WHERE " + where[u"statements"]
 
         query += u" LIMIT %s OFFSET %s"
 

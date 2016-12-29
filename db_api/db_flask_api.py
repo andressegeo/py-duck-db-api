@@ -67,7 +67,6 @@ class DBFlaskAPI(object):
                     (
                         u"$match", db_parser.parse_match(
                             stage.get(u"$match", {}),
-                            use_alias=True,
                             is_formated=custom_dependencies is None,
                             from_state=custom_dependencies
                         )

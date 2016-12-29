@@ -283,34 +283,6 @@ def test_parse_match(db_parser):
     assert ret[u"values"][0] == 1
 
 
-def test_parse_filters_with_alias(db_parser):
-    ret = db_parser.parse_match({
-        u"$or": [
-            {
-                u"project.client.id": 1
-            }, {
-                u"$and": [
-                    {
-                        u"startedAt": {
-                            u"$gte": 1477180920
-                        }
-                    }, {
-                        u"affectedTo.email": {
-                            u"$eq": u"klambert@gpartner.eu"
-                        }
-                    }
-                ]
-            }
-        ]
-    }, use_alias=True)
-
-    assert ret[u"statements"] == u"(`client.id` = %s OR (`hour.started_at` >= FROM_UNIXTIME(%s) AND `affected_to.email` = %s))"
-    assert ret[u"values"][0] == 1
-    assert ret[u"values"][1] == 1477180920
-    assert ret[u"values"][2] == u"klambert@gpartner.eu"
-
-
-
 def test_is_field(db_parser):
     base_state = db_parser.generate_base_state()
     db_parser._last_state = base_state
@@ -325,18 +297,6 @@ def test_is_field(db_parser):
 
     ret = db_parser.is_field(u"started_at")
     assert ret is True
-
-
-def test_get_json_for_formatted_header(db_parser):
-
-    ret = db_parser.formated_to_header(u"issue")
-    assert ret == u"`hour`.`issue`"
-
-    ret = db_parser.formated_to_header(u"affectedTo.email")
-    assert ret == u"`affected_to`.`email`"
-
-    ret = db_parser.formated_to_header(u"startedAt")
-    assert ret == u"`hour`.`started_at`"
 
 
 def test_parse_update(db_parser):
@@ -420,7 +380,7 @@ def test_parse_insert(db_parser):
 
 def test_generate_dependencies(db_parser):
     ret = db_parser.generate_base_state()
-    for field in [u"fields", u"table", u"joins"]:
+    for field in [u"fields", u"joins"]:
         assert field in ret
 
 
@@ -497,10 +457,12 @@ def test_generate_description(db_parser):
 def test_parse_project(db_parser):
 
     ret = db_parser.parse_project(project={
-        u"id": 1,
-        u"issue_formated": u"$issue",
-        u"user_email": u"$affectedTo.email"
-    })
+            u"id": 1,
+            u"issue_formated": u"$issue",
+            u"user_email": u"$affected_to.email"
+        },
+        from_state=db_parser.generate_base_state()
+    )
 
     assert ret[u"statements"] == u"`hour.issue` AS %s, `hour.id`, `affected_to.email` AS %s"
     assert ret[u'values'] == [u"issue_formated", u"user_email"]
@@ -513,25 +475,23 @@ def test_parse_filter_with_custom_dependencies(db_parser):
                 {u"issue_formated": u"test2"}
             ]
         },
-        is_formated=False,
         from_state=(
-            [
-                {
-                    "alias": "issue_formated",
-                    "db_field": "issue_formated"
-                },
-                {
-                    "alias": "hour.id",
-                    "db_field": "hour.id"
-                },
-                {
-                    "alias": "user_email",
-                    "db_field": "user_email"
-                }
-            ],
-            "",
-            [],
-            []
+            {
+                u"fields" : [
+                    {
+                        "alias": "issue_formated",
+                        "db_field": "issue_formated"
+                    },
+                    {
+                        "alias": "hour.id",
+                        "db_field": "hour.id"
+                    },
+                    {
+                        "alias": "user_email",
+                        "db_field": "user_email"
+                    }
+                ]
+            }
         )
     )
 

@@ -300,7 +300,8 @@ class DBParser(object):
     def is_field(self, key):
         return self.find_field(key) is not None
 
-    def parse_project(self, project, dependencies=None):
+    def parse_project(self, project, from_state=None):
+        self._last_state = from_state
         ret = {
             u"statements": [],
             u"values": [],
@@ -309,15 +310,15 @@ class DBParser(object):
 
         for key in project:
             if project[key] == 1:
-                db_field = self.formated_to_header(key, use_alias=True, from_state=dependencies)
-                ret[u'statements'].append(db_field)
+                db_field = self.find_field(key)
+                ret[u'statements'].append(u"`" + db_field + u"`")
                 ret[u'dependencies'][0].append({
                     u"alias": db_field[1:-1],
                     u"db_field": db_field[1:-1]
                 })
             elif type(project[key]) is unicode and u"$" in project[key]:
-                db_field = self.formated_to_header(project[key][1:], use_alias=True, from_state=dependencies)
-                ret[u'statements'].append(u"{} AS %s".format(db_field))
+                db_field = self.find_field(project[key][1:])
+                ret[u'statements'].append(u"`{}` AS %s".format(db_field))
                 ret[u'values'].append(key)
                 ret[u'dependencies'][0].append({
                     u"alias": key,
