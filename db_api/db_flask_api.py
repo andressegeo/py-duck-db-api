@@ -93,6 +93,19 @@ class DBFlaskAPI(object):
                 )
                 # Project alter the state. Use custom one
                 custom_state = ret[u'state']
+            elif u"$group" in stage:
+                ret = db_parser.parse_group(
+                    group=stage.get(u"$group"),
+                    from_state=custom_state or base_state
+                )
+                stages.append(
+                    {
+                        u"type": u"group",
+                        u"parsed": ret
+                    }
+                )
+                # Group alter the state. Use custom one
+                custom_state = ret[u'state']
 
         items = self.db_connection.aggregate(
             table,

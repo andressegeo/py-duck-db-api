@@ -19,11 +19,11 @@ class DBParser(object):
             u"$ne": u"!="
         }
 
-        self._STAGES_BINDINGS = {
-            u"$match": self.match,
-            u"$group": self.group
+        self._GROUP_OPERATORS = {
+            u"$sum": u"SUM",
+            u"$avg": u"AVG"
         }
-        
+
         self._RECURSIVE_OPERATORS = {
             u"$and": u"AND",
             u"$or": u"OR"
@@ -218,18 +218,6 @@ class DBParser(object):
         return [column for column in self._base_columns
             if u"referenced_table_name" in column]
 
-
-    def find_col_field(self, key, field_key=u"alias"):
-        for field in self._last_state.get(u"fields", []):
-
-            if field.get(u"formated", u"") != u"" and key == field.get(u"formated", u""):
-                return field.get(field_key)
-
-            for variable in [key, self._table + u"." + key]:
-                if variable == field.get(u"alias"):
-                    return field.get(field_key)
-        return None
-
     def parse_match(
             self,
             match,
@@ -325,7 +313,6 @@ class DBParser(object):
         for key in project:
             if project[key] == 1:
                 field = self.find_col_field(key)
-                db_field = self.find_col_field(key, field_key=u"db")
                 ret[u'statements'].append(u"`" + field + u"`")
                 ret[u'state'][u"fields"].append({
                     u"alias": key,
@@ -334,7 +321,6 @@ class DBParser(object):
             elif type(project[key]) is unicode and u"$" in project[key]:
 
                 field = self.find_col_field(project[key][1:])
-                db_field = self.find_col_field(project[key][1:], field_key=u"db")
                 ret[u'statements'].append(u"`{}` AS %s".format(field))
                 ret[u'values'].append(key)
                 ret[u'state'][u"fields"].append({
@@ -346,6 +332,77 @@ class DBParser(object):
 
         ret[u'statements'] = u", ".join(ret[u'statements'])
         return ret
+
+    def find_col_field(self, key, field_key=u"alias"):
+        for field in self._last_state.get(u"fields", []):
+            if field.get(u"formated", u"") != u"" and key == field.get(u"formated", u""):
+                return field.get(field_key)
+
+            for variable in [key, self._table + u"." + key]:
+                if variable == field.get(u"alias"):
+                    return field.get(field_key)
+        return None
+
+    def parse_group(self, group, from_state):
+        self._last_state = from_state
+        ret = {
+            u"fields": [],
+            u"group_by": [],
+            u"values": [],
+            u"state": {
+                u"fields": []
+            }  # Dependencies for potential next stage
+        }
+
+        # Could be ignored, but MongoDB requires it. We stay with this then.
+        if u"_id" not in group:
+            raise ValueError(u"_id field is mandatory")
+
+        for key in group:
+            if key == u"_id" and group[key] is not None:
+                group_by = group[key]
+                for grp_key in group_by:
+                    if type(group_by[grp_key]) is unicode and u"$" == group_by[grp_key][0]:
+                        field = self.find_col_field(group_by[grp_key][1:])
+                        ret[u"group_by"].append(u"`{}`".format(field))
+                        id_field = u"_id.{}".format(field)
+                        ret[u"fields"].append(u"`{}` AS `{}`".format(field, id_field))
+                        ret[u"state"][u"fields"].append({
+                            u"alias": id_field,
+                            u"formated": id_field
+                        })
+            elif type(group[key]) == dict:
+
+                accumulators = group[key]
+                for acc_key in accumulators:
+                    acc_op = self._GROUP_OPERATORS.get(acc_key, None)
+                    acc_val = accumulators.get(acc_key, None)
+                    if acc_val == 1:
+                        ret[u"fields"].append(u"{}(`{}`) AS `{}`".format(
+                            acc_op,
+                            u"*",
+                            u"%s"
+                        ))
+                        ret[u"values"].append(key)
+                        ret[u"state"][u"fields"].append({
+                            u"alias": key,
+                            u"formated": key
+                        })
+                    elif type(acc_val) is unicode and acc_val[0] == u"$":
+                        field = self.find_col_field(acc_val[1:])
+                        ret[u"fields"].append(u"{}(`{}`) AS {}".format(
+                            acc_op,
+                            field,
+                            u"%s"
+                        ))
+                        ret[u"values"].append(key)
+                        ret[u"state"][u"fields"].append({
+                            u"alias": key,
+                            u"formated": key
+                        })
+
+        return ret
+
 
     def to_db_field_selector(self, field):
         if u"." not in field:
@@ -456,20 +513,3 @@ class DBParser(object):
                     break
 
         return insert
-
-    def group(self, pattern):
-        pass
-
-    def match(self, pattern):
-        pass
-
-    def get_stage(self, stage):
-        for key in stage:
-            if key in self.__stages_binding:
-                 return self.__stages_binding[key](stage)
-
-    def aggregate(self, aggregation):
-        ret = []
-
-        for stage in aggregation:
-            ret.append(self.get_stage(stage))

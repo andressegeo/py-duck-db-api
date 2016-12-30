@@ -317,6 +317,17 @@ class DBConnection(object):
                 )
                 values = parsed.get(u"values") + values
                 last_state = parsed.get(u"state")
+            elif stage_type == u"group":
+                query = u"SELECT {} FROM ( {} ) AS s_{}".format(
+                    u", ".join(parsed.get(u"fields", [])),
+                    query,
+                    index + 1
+                )
+                if len(parsed.get(u"group_by", [])) > 0:
+                    query += u" GROUP BY {}".format(u", ".join(parsed.get(u"group_by")))
+
+                values = parsed.get(u"values") + values
+                last_state = parsed.get(u"state")
 
         last_state = last_state or base_state
         fetched = self._execute(query, values)

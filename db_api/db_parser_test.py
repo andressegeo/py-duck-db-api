@@ -466,3 +466,58 @@ def test_parse_project(db_parser):
     assert ret[u"statements"] == u"`hour.issue` AS %s, `hour.id`, `affected_to.email` AS %s"
     assert ret[u'values'] == [u"issue_formated", u"user_email"]
 
+
+def test_parse_group(db_parser):
+    ret = db_parser.parse_group(group={
+            u"_id": {
+                u"affected_to": u"$affected_to.id",
+                u"project": u"$project.id"
+            },
+            u"minutes_by_person_and_project": {
+                u"$sum": u"$minutes"
+            }
+        },
+        from_state=db_parser.generate_base_state()
+    )
+
+    expected_state_fields = [
+        {
+            u"alias": u"_id.project.id",
+            u"formated": u"_id.project.id"
+        },
+        {
+            u"alias": u"_id.affected_to.id",
+            u"formated": u"_id.affected_to.id"
+        },
+        {
+            u"alias": u"minutes_by_person_and_project",
+            u"formated": u"minutes_by_person_and_project"
+        }
+    ]
+
+    expected_group_by = [
+        u"`project.id`",
+        u"`affected_to.id`"
+    ]
+
+    expected_values = [
+        u"minutes_by_person_and_project"
+    ]
+
+    expected_fields = [
+        u"`project.id` AS `_id.project.id`",
+        u"`affected_to.id` AS `_id.affected_to.id`",
+        u"SUM(`hour.minutes`) AS %s"
+    ]
+
+    for field in expected_state_fields:
+        assert field in ret[u"state"][u"fields"]
+
+    for group in expected_group_by:
+        assert group in ret[u"group_by"]
+
+    for value in expected_values:
+        assert value in ret[u"values"]
+
+    for field in expected_fields:
+        assert field in ret[u"fields"]
