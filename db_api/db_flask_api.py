@@ -57,44 +57,53 @@ class DBFlaskAPI(object):
             columns=self.db_connection.get_columns(table)
         )
 
-        pipeline = json.loads(request.args.get(u'pipeline', []))
-        base_dependencies = db_parser.generate_base_state()
+        # Get pipeline from payload or url arg
+        data = request.data
+        if data is not None and data != u"":
+            data = json.loads(data, encoding=u"utf-8")
+        pipeline = json.loads(request.args.get(u'pipeline', u"[]")) or data.get(u"pipeline", [])
+
+
+        base_state = db_parser.generate_base_state()
         stages = []
-        custom_dependencies = None
+        custom_state = None
+
         for stage in pipeline:
             if u"$match" in stage:
+                ret = db_parser.parse_match(
+                    match=stage.get(u"$match", {}),
+                    from_state=custom_state or base_state
+                )
                 stages.append(
-                    (
-                        u"$match", db_parser.parse_match(
-                            stage.get(u"$match", {}),
-                            is_formated=custom_dependencies is None,
-                            from_state=custom_dependencies
-                        )
-                    )
+                    {
+                        u"type": u"match",
+                        u"parsed": ret
+                    }
                 )
             elif u"$project" in stage:
                 ret = db_parser.parse_project(
                     stage.get(u"$project"),
-                    dependencies=custom_dependencies
+                    from_state=custom_state or base_state
                 )
                 stages.append(
-                    (u"$project", ret)
+                    {
+                        u"type": u"project",
+                        u"parsed": ret
+                    }
                 )
-                custom_dependencies = ret[u'dependencies']
+                # Project alter the state. Use custom one
+                custom_state = ret[u'state']
 
-        def formater(headers, rows, fields):
-            return db_parser.rows_to_formated(headers, rows, fields, is_formated=custom_dependencies is None)
 
         items = self.db_connection.aggregate(
-            base_dependencies, 
-            formater=formater,
-            stages=stages
+            table,
+            base_state,
+            stages,
+            formater=db_parser.rows_to_formated
         )
-
         result[u'items'] = items
 
         return jsonify(result), code
-
 
     def handle_request(self, request, table):
         result = {}
@@ -115,15 +124,14 @@ class DBFlaskAPI(object):
             data = json.loads(data, encoding=u"utf-8")
 
         base_state = db_parser.generate_base_state()
-        match_state = db_parser.parse_match(match=filters, from_state=base_state)
 
         if request.method == u"GET":
-
+            filters = db_parser.parse_match(match=filters, from_state=base_state)
             items = self.db_connection.select(
                 fields=base_state.get(u"fields"),
                 table=table,
                 joins=base_state.get(u"joins"),
-                where=match_state,
+                where=filters,
                 formater=db_parser.rows_to_formated,
                 first=request.args.get(u"first"),
                 nb=request.args.get(u"nb")
@@ -136,14 +144,18 @@ class DBFlaskAPI(object):
             }
 
         elif request.method == u"PUT":
-
+            filters = db_parser.parse_match(
+                match=filters,
+                from_state=base_state,
+                filter_with_alias=False
+            )
             count = self.db_connection.update(
                 table=table,
                 update=db_parser.parse_update(
                     data=data
                 ),
-                joins=dependencies[2],
-                where=dependencies[3]
+                joins=base_state.get(u"joins"),
+                where=filters
             )
 
             result = {
@@ -151,11 +163,15 @@ class DBFlaskAPI(object):
             }
 
         elif request.method == u"DELETE":
-
+            filters = db_parser.parse_match(
+                match=filters,
+                from_state=base_state,
+                filter_with_alias=False
+            )
             count = self.db_connection.delete(
                 table=table,
-                joins=dependencies[2],
-                where=dependencies[3]
+                joins=base_state.get(u"joins"),
+                where=filters,
             )
 
             result = {
@@ -165,9 +181,14 @@ class DBFlaskAPI(object):
         elif request.method == u"POST":
 
             try:
+                insert = db_parser.parse_insert(data=data)
                 count = self.db_connection.insert(
-                    insert=db_parser.parse_insert(data=data)
+                    table=db_parser._table,
+                    fields=insert[u"fields"],
+                    positional_values=insert[u'positional_values'],
+                    values=insert[u"values"]
                 )
+
                 result = {
                     u"id": count
                 }

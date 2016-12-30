@@ -176,9 +176,9 @@ def test_get_wrapped_values(db_parser):
     base_state = db_parser.generate_base_state()
     db_parser._last_state = base_state
     wrapped_values = db_parser.get_wrapped_values(headers=[
-            u"`hour`.`issue`",
-            u"`hour`.`id`",
-            u"`hour`.`started_at`"
+            u"hour.issue",
+            u"hour.id",
+            u"hour.started_at"
         ],
         values=[
             u"test",
@@ -466,32 +466,3 @@ def test_parse_project(db_parser):
     assert ret[u"statements"] == u"`hour.issue` AS %s, `hour.id`, `affected_to.email` AS %s"
     assert ret[u'values'] == [u"issue_formated", u"user_email"]
 
-
-def test_parse_filter_with_custom_dependencies(db_parser):
-    ret = db_parser.parse_match({
-            u"$or": [
-                {u"hour.id": 5},
-                {u"issue_formated": u"test2"}
-            ]
-        },
-        from_state=(
-            {
-                u"fields" : [
-                    {
-                        "alias": "issue_formated",
-                        "db_field": "issue_formated"
-                    },
-                    {
-                        "alias": "hour.id",
-                        "db_field": "hour.id"
-                    },
-                    {
-                        "alias": "user_email",
-                        "db_field": "user_email"
-                    }
-                ]
-            }
-        )
-    )
-
-    print(json.dumps(ret, indent=4))

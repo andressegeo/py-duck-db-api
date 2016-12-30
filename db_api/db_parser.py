@@ -219,6 +219,17 @@ class DBParser(object):
             if u"referenced_table_name" in column]
 
 
+    def find_col_field(self, key, field_key=u"alias"):
+        for field in self._last_state.get(u"fields", []):
+
+            if field.get(u"formated", u"") != u"" and key == field.get(u"formated", u""):
+                print(field)
+                return field.get(field_key)
+
+            for variable in [key, self._table + u"." + key]:
+                if variable == field.get(u"alias"):
+                    return field.get(field_key)
+        return None
 
     def parse_match(
             self,
@@ -226,6 +237,7 @@ class DBParser(object):
             from_state,
             operator=u"AND",
             parent=None,
+            filter_with_alias=True
     ):
         self._last_state = from_state
 
@@ -244,13 +256,19 @@ class DBParser(object):
             for key in filter:
                 # If key is an operator
                 if self.is_field(key):
-                    db_field = self.find_col_field(key)
+
+                    field = self.find_col_field(key)
                     value = self.get_wrapped_values(
-                        [db_field],
+                        [field],
                         [filter[key]]
                     )
+                    if not filter_with_alias:
+                        field = self.find_col_field(key, field_key=u"db")
+                    else:
+                        field = u"`" + field + u"`"
+
                     if type(filter[key]) in [unicode, str, int, float]:
-                        where[u"statements"].append(u"`" + db_field + u"`" + u" = " + value)
+                        where[u"statements"].append(field + u" = " + value)
                         where[u"values"].append(filter[key])
 
                     elif type(filter[key]) is dict:
@@ -261,12 +279,18 @@ class DBParser(object):
 
                 elif key in self._OPERATORS and parent is not None:
 
-                    db_field = self.find_col_field(parent)
+                    field = self.find_col_field(parent)
                     value = self.get_wrapped_values(
-                        [db_field],
+                        [field],
                         [filter[key]]
                     )
-                    where[u"statements"].append(u"`" + db_field + u"`" + u" " + self._OPERATORS[key] + u" " + value)
+
+                    if not filter_with_alias:
+                        field = self.find_col_field(key, field_key=u"db")
+                    else:
+                        field = u"`" + field + u"`"
+
+                    where[u"statements"].append(field + u" " + self._OPERATORS[key] + u" " + value)
                     where[u"values"].append(filter[key])
 
                 elif key in self._RECURSIVE_OPERATORS:
@@ -294,24 +318,29 @@ class DBParser(object):
         ret = {
             u"statements": [],
             u"values": [],
-            u"dependencies": ([], u"", [], [])  # Dependencies for potential next stage
+            u"state": {
+                u"fields": []
+            }  # Dependencies for potential next stage
         }
 
         for key in project:
             if project[key] == 1:
-                db_field = self.find_col_field(key)
-                ret[u'statements'].append(u"`" + db_field + u"`")
-                ret[u'dependencies'][0].append({
-                    u"alias": db_field[1:-1],
-                    u"db_field": db_field[1:-1]
+                field = self.find_col_field(key)
+                db_field = self.find_col_field(key, field_key=u"db")
+                ret[u'statements'].append(u"`" + field + u"`")
+                ret[u'state'][u"fields"].append({
+                    u"alias": key,
+                    u"formated": key
                 })
             elif type(project[key]) is unicode and u"$" in project[key]:
-                db_field = self.find_col_field(project[key][1:])
-                ret[u'statements'].append(u"`{}` AS %s".format(db_field))
+
+                field = self.find_col_field(project[key][1:])
+                db_field = self.find_col_field(project[key][1:], field_key=u"db")
+                ret[u'statements'].append(u"`{}` AS %s".format(field))
                 ret[u'values'].append(key)
-                ret[u'dependencies'][0].append({
+                ret[u'state'][u"fields"].append({
                     u"alias": key,
-                    u"db_field": key
+                    u"formated": key
                 })
             else:
                 pass
@@ -341,18 +370,6 @@ class DBParser(object):
 
         return output
 
-
-    def find_col_field(self, key, field_key=u"alias"):
-        for field in self._last_state.get(u"fields", []):
-
-            if field.get(u"formated", u"") != u"" and key == field.get(u"formated", u""):
-                return field.get(field_key)
-
-            for variable in [key, self._table + u"." + key]:
-                if variable == field.get(u"alias"):
-                    return field.get(field_key)
-        return None
-
     def get_wrapped_values(self, headers, values):
 
         output = []
@@ -379,13 +396,8 @@ class DBParser(object):
                         break
         return u", ".join(output)
 
-
     def parse_update(self, data):
-
-
         self._last_state = self.generate_base_state()
-
-
         update = {
             u"statements": [],
             u"values": []
@@ -429,6 +441,7 @@ class DBParser(object):
 
         insert = {
             u"fields": [],
+            u"positional_values": [],
             u"values": []
         }
 
@@ -438,9 +451,12 @@ class DBParser(object):
                 data[key] = data[key][u"id"]
             for col in self._base_columns:
                 if col.get(u"table_name") == self._table and col.get(u"column_name") == key:
+                    db_field = u"{}.{}".format(col.get(u"table_name"), col.get(u"column_name"))
+                    wrapped = self.get_wrapped_values([db_field], [data[key]])
                     insert[u'fields'].append(
                         u"`{}`.`{}`".format(col.get(u"table_name"), col.get(u"column_name"))
                     )
+                    insert[u"positional_values"].append(wrapped)
                     insert[u"values"].append(data[key])
                     break
 

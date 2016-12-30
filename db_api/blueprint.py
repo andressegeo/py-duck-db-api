@@ -36,7 +36,7 @@ def construct_db_api_blueprint(
 
     db_api_blueprint = Blueprint(u'db_api', __name__)
 
-    @db_api_blueprint.route(u'/db/<string:table>/aggregation', methods=[u"GET"])
+    @db_api_blueprint.route(u'/db/<string:table>/aggregation', methods=[u"GET", u"POST"])
     def table_aggregation(table):
         return db_flask_api.handle_aggregation(request, table=table)
 

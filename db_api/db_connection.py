@@ -100,8 +100,6 @@ class DBConnection(object):
         return columns
 
     def _base_query(self, fields, table, joins):
-        
-
         headers = [
             field.get(u"db") +
             u" AS `" +
@@ -125,40 +123,6 @@ class DBConnection(object):
         
         return headers, query
 
-    def select(
-            self,
-            fields,
-            table,
-            joins,
-            where=None,
-            formater=None,
-            first=0,
-            nb=100
-    ):
-        if first is None:
-            first = 0
-        if nb is None:
-            nb = 100
-
-        headers, query = self._base_query(fields, table, joins)
-
-        if where is not None and where[u"statements"] != u"":
-            query = u"SELECT * FROM (" + query + u") AS s_0 WHERE " + where[u"statements"]
-
-        query += u" LIMIT %s OFFSET %s"
-
-        cursor = self._db.cursor()
-        cursor.execute(query, (where[u'values'] + [int(nb), int(first)]))
-
-        # If formater in parameter
-        if formater is not None:
-            return formater(
-                headers,
-                cursor.fetchall(),
-                fields
-            )
-
-        return headers, cursor.fetchall()
 
     def update(self, table, joins, update, where):
 
@@ -178,8 +142,10 @@ class DBConnection(object):
             for ref in joins
         ])
 
+
         query = u"""UPDATE """ + table + u" " + joins + u""" """ + update[u"statements"] + where[u"statements"]
 
+        print(query)
         cursor = self._db.cursor()
 
         cursor.execute(u"SELECT COUNT(*) FROM " + table + u" " + joins + u" " + where[u"statements"], where[u"values"])
@@ -244,35 +210,83 @@ class DBConnection(object):
             cursor.connection.commit()
         return cursor.fetchall()
 
-    def aggregate(self, base_dependencies, formater, stages=None):
-        stages = stages or []
-        fields, table, joins, _ = base_dependencies
+    def select(
+            self,
+            fields,
+            table,
+            joins,
+            where=None,
+            formater=None,
+            first=0,
+            nb=100
+    ):
+        if first is None:
+            first = 0
+        if nb is None:
+            nb = 100
 
-        headers, query = self._base_query(fields, table, joins, use_alias=True)
+        headers, query = self._base_query(fields, table, joins)
+
+        if where is not None and where[u"statements"] != u"":
+            query = u"SELECT * FROM (" + query + u") AS s_0 WHERE " + where[u"statements"]
+
+        query += u" LIMIT %s OFFSET %s"
+
+        cursor = self._db.cursor()
+        cursor.execute(query, (where[u'values'] + [int(nb), int(first)]))
+
+        # If formater in parameter
+        if formater is not None:
+            return formater(
+                headers,
+                cursor.fetchall(),
+                fields
+            )
+
+        return headers, cursor.fetchall()
+
+    def aggregate(self, table, base_state, stages=None, formater=None):
+        stages = stages or []
+
+        headers, query = self._base_query(
+            fields=base_state.get(u"fields"),
+            table=table,
+            joins=base_state.get(u"joins")
+        )
+        # Base query
+        query = u"SELECT * FROM (" + query + u") AS s_0"
 
         values = []
-        # For each stage
-        for index, (stage, value) in enumerate(stages):
-            if stage == u"$match":
-                query = "SELECT * FROM ( {} ) AS s_{}".format(
-                    query, 
-                    index, 
-                )
-                if len(value.get(u"statements")) > 0:
-                    query += " WHERE {}".format(
-                        value.get(u'statements')
-                    )
-                    values += value.get(u"values", [])
-            elif stage == u"$project":
-                fields = value.get(u"dependencies")[0]
-                headers = [item.get(u"alias") for item in fields]
-                query = "SELECT {} FROM ( {} ) AS s_{}".format(
-                    value.get(u"statements"),
-                    query,
-                    index,
-                )
-                values = value.get(u"values") + values
 
+        # For each stage
+        for index, stage in enumerate(stages):
+
+            parsed = stage.get(u"parsed")
+            stage_type = stage.get(u"type")
+            print(stage_type)
+            if stage_type == u"match":
+
+                query = u"SELECT * FROM ( {} ) AS s_{}".format(
+                    query, 
+                    index+1,
+                )
+
+                if len(parsed.get(u"values")) > 0:
+                    query += u" WHERE {}".format(
+                        parsed.get(u"statements")
+                    )
+                    values += parsed.get(u"values", [])
+
+            elif stage_type == u"project":
+                query = u"SELECT {} FROM ( {} ) AS s_{}".format(
+                    parsed.get(u"statements"),
+                    query,
+                    index+1,
+                )
+                values = parsed.get(u"values") + values
+                last_state = parsed.get(u"state")
+
+        last_state = last_state or base_state
         values = self._execute(query, values)
 
         # If formater in parameter
@@ -280,16 +294,17 @@ class DBConnection(object):
             return formater(
                 headers,
                 values,
-                fields
+                last_state.get(u"fields")
             )
 
         return headers, values
 
-    def insert(self, insert):
+    def insert(self, table, fields, positional_values, values):
 
         cursor = self._db.cursor()
 
-        cursor.execute(insert[u'statements'], insert[u"values"])
+        query = u"INSERT INTO {}({}) VALUES ({})".format(table, u", ".join(fields), u", ".join(positional_values))
+        cursor.execute(query, values)
 
         cursor.connection.commit()
         return cursor.lastrowid

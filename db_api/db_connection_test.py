@@ -172,7 +172,7 @@ def test_aggregate(
 
     # Do the aggregation
     ret = mock_db_connection.aggregate(
-        base_dependencies=mock_base_dependency,
+        base_state=mock_base_dependency,
         formater=mock_db_parser.rows_to_formated,
         stages=[
             ("$match", mock_filter_dependency_0),
