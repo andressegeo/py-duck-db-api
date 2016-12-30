@@ -328,23 +328,16 @@ class DBConnection(object):
         return headers, fetched
 
     def insert(self, table, fields, positional_values, values):
-        @self._reconnect_on_exception(
-            self._db_api_def.OperationalError,
-            self._connect
-        )
-        def wrapper():
+        cursor = self._db.cursor()
 
-            cursor = self._db.cursor()
+        query = u"INSERT INTO {}({}) VALUES ({})".format(table, u", ".join(fields), u", ".join(positional_values))
+        try:
+            cursor.execute(query, values)
+        except self._db_api_def.OperationalError as e:
+            self._do_reconnect_if_needed(e)
+            cursor.execute(query, values)
 
-            query = u"INSERT INTO {}({}) VALUES ({})".format(table, u", ".join(fields), u", ".join(positional_values))
-            try:
-                cursor.execute(query, values)
-            except self._db_api_def.OperationalError as e:
-                self._do_reconnect_if_needed(e)
-                cursor.execute(query, values)
+        cursor.connection.commit()
+        return cursor.lastrowid
 
-            cursor.connection.commit()
-            return cursor.lastrowid
-
-        return wrapper()
 
