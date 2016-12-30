@@ -30,27 +30,14 @@ class DBConnection(object):
             charset=u"utf8"
         )
 
-    @staticmethod
-    def _reconnect_on_exception(exception_to_handle, reconnect_method):
-        def decorator(function):
-            def wrapper(*args, **kwargs):
-                retry = 1
-                while retry >= 0:
-                    try:
-                        return function(*args, **kwargs)
-                    except exception_to_handle as e:
-                        if retry == 0:
-                            logging.error(str(e))
-                            raise e
-                        else:
-                            logging.warning(str(e))
-                        # Reconnect
-                        retry -= 1
-                        reconnect_method()
-
-
-            return wrapper
-        return decorator
+    def _do_reconnect_if_needed(self, e):
+        if e[0] == 2006:
+            logging.info(u"Connection lost. Reconnecting ... {}".format(e))
+            self._connect()
+            logging.info(u"Connection recovered")
+        else:
+            logging.warning(u"Incident : {}".format(e))
+            raise e
 
     def _execute(self, query, values=None, do_commit=True):
         """
@@ -63,17 +50,17 @@ class DBConnection(object):
         :return:
         """
 
-        @self._reconnect_on_exception(
-            self._db_api_def.OperationalError,
-            self._connect
-        )
-        def wrapper():
-            cursor = self._db.cursor()
+        cursor = self._db.cursor()
+
+        try:
+            cursor.execute(query, values)
+        except self._db_api_def.OperationalError as e:
+            self._do_reconnect_if_needed(e)
             cursor.execute(query, values)
 
-            if do_commit:
-                cursor.connection.commit()
-            return cursor.fetchall()
+        if do_commit:
+            cursor.connection.commit()
+        return cursor.fetchall()
 
         return wrapper()
 
@@ -201,9 +188,7 @@ class DBConnection(object):
         )
 
         count = fetched[0][0]
-
         self._execute(query, update[u"values"] + where[u"values"])
-
         return count
 
     def delete(self, table, joins, where):
@@ -352,7 +337,12 @@ class DBConnection(object):
             cursor = self._db.cursor()
 
             query = u"INSERT INTO {}({}) VALUES ({})".format(table, u", ".join(fields), u", ".join(positional_values))
-            cursor.execute(query, values)
+            try:
+                cursor.execute(query, values)
+            except self._db_api_def.OperationalError as e:
+                self._do_reconnect_if_needed(e)
+                cursor.execute(query, values)
+
             cursor.connection.commit()
             return cursor.lastrowid
 
