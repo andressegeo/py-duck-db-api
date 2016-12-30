@@ -218,18 +218,7 @@ class DBParser(object):
         return [column for column in self._base_columns
             if u"referenced_table_name" in column]
 
-    def find_field(self, key):
-        for field in self._last_state.get(u"fields", []):
-            if key == field.get(u"formated", u""):
-                return field.get(u"alias")
 
-            for variable in [key, self._table + u"." + key]:
-                is_field = (u"`" + variable + u"`" == field.get(u"alias"))
-
-                if is_field:
-                    return field.get(u"alias")
-
-        return None
 
     def parse_match(
             self,
@@ -255,7 +244,7 @@ class DBParser(object):
             for key in filter:
                 # If key is an operator
                 if self.is_field(key):
-                    db_field = self.find_field(key)
+                    db_field = self.find_col_field(key)
                     value = self.get_wrapped_values(
                         [db_field],
                         [filter[key]]
@@ -272,7 +261,7 @@ class DBParser(object):
 
                 elif key in self._OPERATORS and parent is not None:
 
-                    db_field = self.find_field(parent)
+                    db_field = self.find_col_field(parent)
                     value = self.get_wrapped_values(
                         [db_field],
                         [filter[key]]
@@ -298,7 +287,7 @@ class DBParser(object):
         return where
 
     def is_field(self, key):
-        return self.find_field(key) is not None
+        return self.find_col_field(key) is not None
 
     def parse_project(self, project, from_state=None):
         self._last_state = from_state
@@ -310,14 +299,14 @@ class DBParser(object):
 
         for key in project:
             if project[key] == 1:
-                db_field = self.find_field(key)
+                db_field = self.find_col_field(key)
                 ret[u'statements'].append(u"`" + db_field + u"`")
                 ret[u'dependencies'][0].append({
                     u"alias": db_field[1:-1],
                     u"db_field": db_field[1:-1]
                 })
             elif type(project[key]) is unicode and u"$" in project[key]:
-                db_field = self.find_field(project[key][1:])
+                db_field = self.find_col_field(project[key][1:])
                 ret[u'statements'].append(u"`{}` AS %s".format(db_field))
                 ret[u'values'].append(key)
                 ret[u'dependencies'][0].append({
@@ -337,33 +326,7 @@ class DBParser(object):
 
 
 
-    def parse_update(self, data):
-        update = {
-            u"statements": [],
-            u"values": []
-        }
 
-        if u"$set" in data:
-            data[u"$set"] = self.to_one_level_json(data[u"$set"])
-            db_fields, values = zip(*[
-                (
-                    self.formated_to_header(field, use_referenced=True),
-                    data[u"$set"][field]
-                ) for field in data[u"$set"]]
-            )
-
-            for index, db_field in enumerate(db_fields):
-                if self._table in db_field:
-                    wrapped = self.get_wrapped_values([db_field], [values[index]])
-                    update[u"statements"] += [(db_field + u" = " + wrapped)]
-                    update[u"values"].append(values[index])
-
-        update[u"statements"] = u", ".join(update[u"statements"])
-
-        if update[u"statements"] != u"":
-            update[u"statements"] = u"SET " + update[u"statements"]
-
-        return update
 
     def to_one_level_json(self, obj, parent=None):
         output = {}
@@ -377,6 +340,18 @@ class DBParser(object):
                 output.update(self.to_one_level_json(obj[key], parent + [key]))
 
         return output
+
+
+    def find_col_field(self, key, field_key=u"alias"):
+        for field in self._last_state.get(u"fields", []):
+
+            if field.get(u"formated", u"") != u"" and key == field.get(u"formated", u""):
+                return field.get(field_key)
+
+            for variable in [key, self._table + u"." + key]:
+                if variable == field.get(u"alias"):
+                    return field.get(field_key)
+        return None
 
     def get_wrapped_values(self, headers, values):
 
@@ -404,26 +379,72 @@ class DBParser(object):
                         break
         return u", ".join(output)
 
-    def parse_insert(self, data):
-        insert = {
-            u"statements": u"INSERT INTO `" + self._table + u"`(#fields) VALUES(#values)",
+
+    def parse_update(self, data):
+
+
+        self._last_state = self.generate_base_state()
+
+
+        update = {
+            u"statements": [],
             u"values": []
         }
 
-        one_level_data = self.to_one_level_json(data)
-        db_fields, insert[u"values"] = zip(*[
-            (self.formated_to_header(field, use_referenced=True), one_level_data[field])
-            for field in one_level_data
-            if self._table in self.formated_to_header(field, use_referenced=True)
-        ])
+        if u"$set" in data:
+            data = self.to_one_level_json(data[u"$set"])
 
-        insert[u"statements"] = insert[u"statements"].replace(u"#fields", u", ".join(list(db_fields)))
-        insert[u"statements"] = insert[u"statements"].replace(u"#values", self.get_wrapped_values(db_fields, insert[u"values"]))
+            # Reformat
+            reformated_data = {}
+            for key in data:
+                if type(data[key]) is dict:
+                    reformated_data[key] = data[key][u"id"]
+                elif type(data[key]) is not dict and type(key) in [str, unicode] and key.count(u".") == 1:
+                    tab = key.split(u".")
+                    if len(tab) == 2 and tab[1] == u"id":
+                        reformated_data[tab[0]] = data[key]
+                else:
+                    reformated_data[key] = data[key]
+
+            data = reformated_data
+            for key in data:
+                for col in self._base_columns:
+                    if col.get(u"table_name") == self._table and col.get(u"column_name") == key:
+                        db_field = u"{}.{}".format(col.get(u"table_name"), col.get(u"column_name"))
+                        wrapped = self.get_wrapped_values([db_field], [data[key]])
+                        db_field = u"`{}`.`{}`".format(col.get(u"table_name"), col.get(u"column_name"))
+                        update[u"statements"] += [(db_field + u" = " + wrapped)]
+                        update[u"values"].append(data[key])
+
+        update[u"statements"] = u", ".join(update[u"statements"])
+
+        if update[u"statements"] != u"":
+            update[u"statements"] = u"SET " + update[u"statements"]
+
+        return update
+
+    def parse_insert(self, data):
+
+        self._last_state = self.generate_base_state()
+
+        insert = {
+            u"fields": [],
+            u"values": []
+        }
+
+        # Remove external dep
+        for key in data:
+            if type(data[key]) is dict:
+                data[key] = data[key][u"id"]
+            for col in self._base_columns:
+                if col.get(u"table_name") == self._table and col.get(u"column_name") == key:
+                    insert[u'fields'].append(
+                        u"`{}`.`{}`".format(col.get(u"table_name"), col.get(u"column_name"))
+                    )
+                    insert[u"values"].append(data[key])
+                    break
 
         return insert
-
-
-
 
     def group(self, pattern):
         pass

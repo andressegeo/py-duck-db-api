@@ -308,27 +308,27 @@ def test_parse_update(db_parser):
         }
     })
 
+
     assert ret[u"statements"] == u"SET `hour`.`issue` = %s, `hour`.`comments` = %s"
     assert ret[u"values"][1] == u"updated comment"
     assert ret[u"values"][0] == u"updated issue"
 
     ret = db_parser.parse_update({
         u"$set": {
-            u"affectedTo.id": 1,
+            u"affected_to.id": 1,
             u"project.id": 1,
-            u"startedAt": 1477434540
+            u"started_at": 1477434540
         }
     })
-
-    assert ret[u"statements"] == u"SET `hour`.`affected_to` = %s, `hour`.`project` = %s, `hour`.`started_at` = FROM_UNIXTIME(%s)"
-    assert ret[u"values"][0] == 1
+    assert ret[u"statements"] == u"SET `hour`.`started_at` = FROM_UNIXTIME(%s), `hour`.`project` = %s, `hour`.`affected_to` = %s"
     assert ret[u"values"][1] == 1
+    assert ret[u"values"][2] == 1
 
     ret = db_parser.parse_update({
         u"$set": {
-            u"affectedTo": {
+            u"affected_to": {
                 u"id": 1,
-                u"name" : "Kevin LAMBERT"
+                u"name": u"Kevin LAMBERT"
             },
             u"project": {
                 u"id": 1
@@ -337,7 +337,7 @@ def test_parse_update(db_parser):
         }
     })
 
-    assert ret[u"statements"] == u"SET `hour`.`affected_to` = %s, `hour`.`project` = %s"
+    assert ret[u"statements"] == u"SET `hour`.`project` = %s, `hour`.`affected_to` = %s"
     assert ret[u"values"][0] == 1
     assert ret[u"values"][1] == 1
 
@@ -351,8 +351,8 @@ def test_parse_insert(db_parser):
             u"id": 1,
             u"name": u"Interne"
         },
-        u"startedAt": 1476057600,
-        u"affectedTo": {
+        u"started_at": 1476057600,
+        u"affected_to": {
             u"email": u"klambert@gpartner.eu",
             u"id": 1,
             u"name": u"Kévin LAMBERT"
@@ -368,14 +368,13 @@ def test_parse_insert(db_parser):
         u"`hour`.`comments`"
     ]
 
-    assert u"INSERT INTO `hour`" in ret[u"statements"]
     for column_to_check in columns_to_check:
-        assert column_to_check in ret[u"statements"]
+        assert column_to_check in ret[u"fields"]
     str_vals = u",".join([str(val) for val in ret[u"values"]])
 
     # Check if values are in array
     for val in (5, 1, 1, u'test', u'test', 1476057600):
-        assert str(val) in str_vals
+        assert val in ret[u"values"]
 
 
 def test_generate_dependencies(db_parser):
