@@ -223,7 +223,6 @@ class DBParser(object):
         for field in self._last_state.get(u"fields", []):
 
             if field.get(u"formated", u"") != u"" and key == field.get(u"formated", u""):
-                print(field)
                 return field.get(field_key)
 
             for variable in [key, self._table + u"." + key]:
@@ -352,10 +351,6 @@ class DBParser(object):
         if u"." not in field:
             field = self._table + u"." + field
         return u"`" + field + u"`"
-
-
-
-
 
     def to_one_level_json(self, obj, parent=None):
         output = {}

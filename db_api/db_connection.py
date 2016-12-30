@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 
-import datetime
-import calendar
 import json
+import logging
+
 
 class DBConnection(object):
+
     def __init__(
             self,
             db_api_def,
@@ -14,16 +15,67 @@ class DBConnection(object):
             host=u"127.0.0.1"):
 
         self._db_api_def = db_api_def
+        self._host = host
+        self._user = user
+        self._password = password
+        self._database = database
+        self._connect()
 
-        self._db = db_api_def.connect(
-            host=host,
-            user=user,
-            passwd=password,
-            db=database,
+    def _connect(self):
+        self._db = self._db_api_def.connect(
+            host=self._host,
+            user=self._user,
+            passwd=self._password,
+            db=self._database,
             charset=u"utf8"
         )
 
-        self._database = database
+    @staticmethod
+    def _reconnect_on_exception(exception_to_handle, reconnect_method):
+        def decorator(function):
+            def wrapper(*args, **kwargs):
+                retry = 1
+                while retry >= 0:
+                    try:
+                        return function(*args, **kwargs)
+                    except exception_to_handle as e:
+                        if retry == 0:
+                            logging.error(str(e))
+                            raise e
+                        else:
+                            logging.warning(str(e))
+                        # Reconnect
+                        retry -= 1
+                        reconnect_method()
+
+
+            return wrapper
+        return decorator
+
+    def _execute(self, query, values=None, do_commit=True):
+        """
+        :type query: string
+        :param query: The SQL query to execute
+        :type values: List
+        :param values: The values to sanitize & pass to the query to replace the "%s" values.
+        :type do_commit: Bool
+        :param do_commit: If the value has to be saved immediately, or can allow a rollback.
+        :return:
+        """
+
+        @self._reconnect_on_exception(
+            self._db_api_def.OperationalError,
+            self._connect
+        )
+        def wrapper():
+            cursor = self._db.cursor()
+            cursor.execute(query, values)
+
+            if do_commit:
+                cursor.connection.commit()
+            return cursor.fetchall()
+
+        return wrapper()
 
     def get_referenced(self, table):
         cursor = self._db.cursor()
@@ -40,7 +92,7 @@ class DBConnection(object):
         AND REFERENCED_TABLE_NAME IS NOT NULL
         """
 
-        cursor.execute(query, (self._database, table))
+        fetched = self._execute(query, values=(self._database, table))
 
         referenced = [
             {
@@ -50,7 +102,7 @@ class DBConnection(object):
                 u"referenced_column_name": constraint[3],
                 u"referenced_alias": constraint[1]
             }
-            for constraint in cursor.fetchall()
+            for constraint in fetched
             ]
 
         for ref in referenced:
@@ -61,17 +113,16 @@ class DBConnection(object):
     def get_columns(self, table, alias=None):
 
         referenced = self.get_referenced(table)
-        cursor = self._db.cursor()
 
         query = u"""
         DESCRIBE
         """ + table + """"""
 
-        cursor.execute(query)
+        fetched = self._execute(query)
 
         columns = []
         # For each row
-        for row in cursor.fetchall():
+        for row in fetched:
             column = {
                 u"table_name": table,
                 u"column_name": row[0],
@@ -99,7 +150,8 @@ class DBConnection(object):
             columns.append(column)
         return columns
 
-    def _base_query(self, fields, table, joins):
+    @staticmethod
+    def _base_query(fields, table, joins):
         headers = [
             field.get(u"db") +
             u" AS `" +
@@ -123,7 +175,6 @@ class DBConnection(object):
         
         return headers, query
 
-
     def update(self, table, joins, update, where):
 
         if where[u"statements"] != u"":
@@ -142,17 +193,16 @@ class DBConnection(object):
             for ref in joins
         ])
 
-
         query = u"""UPDATE """ + table + u" " + joins + u""" """ + update[u"statements"] + where[u"statements"]
 
-        print(query)
-        cursor = self._db.cursor()
+        fetched = self._execute(
+            u"SELECT COUNT(*) FROM " + table + u" " + joins + u" " + where[u"statements"],
+            where[u"values"]
+        )
 
-        cursor.execute(u"SELECT COUNT(*) FROM " + table + u" " + joins + u" " + where[u"statements"], where[u"values"])
-        count = cursor.fetchall()[0][0]
+        count = fetched[0][0]
 
-        cursor.execute(query, update[u"values"] + where[u"values"])
-        cursor.connection.commit()
+        self._execute(query, update[u"values"] + where[u"values"])
 
         return count
 
@@ -180,11 +230,11 @@ class DBConnection(object):
         ])
 
         # Determine how many lines are going to be deleted
-        ret = self._execute(
+        fetched = self._execute(
             query=u"SELECT COUNT(*) FROM " + table + u" " + joins + u" " + where[u"statements"], 
             values=where[u"values"]
         )
-        count = ret[0][0]
+        count = fetched[0][0]
 
         # Execute the final query
         self._execute(
@@ -193,22 +243,6 @@ class DBConnection(object):
         )
 
         return count
-
-    def _execute(self, query, values, do_commit=True):
-        """
-        :type query: string
-        :param query: The SQL query to execute
-        :type values: List
-        :param values: The values to sanitize & pass to the query to replace the "%s" values.
-        :type do_commit: Bool
-        :param do_commit: If the value has to be saved immediately, or can allow a rollback.
-        :return:
-        """
-        cursor = self._db.cursor()
-        cursor.execute(query, values)
-        if do_commit:
-            cursor.connection.commit()
-        return cursor.fetchall()
 
     def select(
             self,
@@ -232,18 +266,17 @@ class DBConnection(object):
 
         query += u" LIMIT %s OFFSET %s"
 
-        cursor = self._db.cursor()
-        cursor.execute(query, (where[u'values'] + [int(nb), int(first)]))
+        fetched = self._execute(query, (where[u'values'] + [int(nb), int(first)]))
 
         # If formater in parameter
         if formater is not None:
             return formater(
                 headers,
-                cursor.fetchall(),
+                fetched,
                 fields
             )
 
-        return headers, cursor.fetchall()
+        return headers, fetched
 
     def aggregate(self, table, base_state, stages=None, formater=None):
         stages = stages or []
@@ -257,13 +290,12 @@ class DBConnection(object):
         query = u"SELECT * FROM (" + query + u") AS s_0"
 
         values = []
-
+        last_state = None
         # For each stage
         for index, stage in enumerate(stages):
 
             parsed = stage.get(u"parsed")
             stage_type = stage.get(u"type")
-            print(stage_type)
             if stage_type == u"match":
 
                 query = u"SELECT * FROM ( {} ) AS s_{}".format(
@@ -287,24 +319,31 @@ class DBConnection(object):
                 last_state = parsed.get(u"state")
 
         last_state = last_state or base_state
-        values = self._execute(query, values)
+        fetched = self._execute(query, values)
 
         # If formater in parameter
         if formater is not None:
             return formater(
                 headers,
-                values,
+                fetched,
                 last_state.get(u"fields")
             )
 
-        return headers, values
+        return headers, fetched
 
     def insert(self, table, fields, positional_values, values):
+        @self._reconnect_on_exception(
+            self._db_api_def.OperationalError,
+            self._connect
+        )
+        def wrapper():
 
-        cursor = self._db.cursor()
+            cursor = self._db.cursor()
 
-        query = u"INSERT INTO {}({}) VALUES ({})".format(table, u", ".join(fields), u", ".join(positional_values))
-        cursor.execute(query, values)
+            query = u"INSERT INTO {}({}) VALUES ({})".format(table, u", ".join(fields), u", ".join(positional_values))
+            cursor.execute(query, values)
+            cursor.connection.commit()
+            return cursor.lastrowid
 
-        cursor.connection.commit()
-        return cursor.lastrowid
+        return wrapper()
+

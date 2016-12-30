@@ -4,6 +4,7 @@ from flask import Flask
 from db_api.blueprint import construct_db_api_blueprint
 import MySQLdb
 
+
 app = Flask(__name__)
 
 from db_api.db_connection import DBConnection
