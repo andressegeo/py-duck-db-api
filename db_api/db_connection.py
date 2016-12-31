@@ -2,7 +2,7 @@
 
 import json
 import logging
-
+import csv
 
 class DBConnection(object):
 
@@ -60,9 +60,7 @@ class DBConnection(object):
 
         if do_commit:
             cursor.connection.commit()
-        return cursor.fetchall()
-
-        return wrapper()
+        return cursor.fetchall(), cursor.description
 
     def get_referenced(self, table):
         cursor = self._db.cursor()
@@ -79,7 +77,7 @@ class DBConnection(object):
         AND REFERENCED_TABLE_NAME IS NOT NULL
         """
 
-        fetched = self._execute(query, values=(self._database, table))
+        fetched, _ = self._execute(query, values=(self._database, table))
 
         referenced = [
             {
@@ -105,7 +103,7 @@ class DBConnection(object):
         DESCRIBE
         """ + table + """"""
 
-        fetched = self._execute(query)
+        fetched, _ = self._execute(query)
 
         columns = []
         # For each row
@@ -182,7 +180,7 @@ class DBConnection(object):
 
         query = u"""UPDATE """ + table + u" " + joins + u""" """ + update[u"statements"] + where[u"statements"]
 
-        fetched = self._execute(
+        fetched, _ = self._execute(
             u"SELECT COUNT(*) FROM " + table + u" " + joins + u" " + where[u"statements"],
             where[u"values"]
         )
@@ -215,7 +213,7 @@ class DBConnection(object):
         ])
 
         # Determine how many lines are going to be deleted
-        fetched = self._execute(
+        fetched, _ = self._execute(
             query=u"SELECT COUNT(*) FROM " + table + u" " + joins + u" " + where[u"statements"], 
             values=where[u"values"]
         )
@@ -251,8 +249,7 @@ class DBConnection(object):
 
         query += u" LIMIT %s OFFSET %s"
 
-        fetched = self._execute(query, (where[u'values'] + [int(nb), int(first)]))
-
+        fetched, description = self._execute(query, (where[u'values'] + [int(nb), int(first)]))
         # If formater in parameter
         if formater is not None:
             return formater(
@@ -261,7 +258,7 @@ class DBConnection(object):
                 fields
             )
 
-        return headers, fetched
+        return [i[0] for i in description], fetched
 
     def aggregate(self, table, base_state, stages=None, formater=None):
         stages = stages or []
@@ -315,7 +312,7 @@ class DBConnection(object):
                 last_state = parsed.get(u"state")
 
         last_state = last_state or base_state
-        fetched = self._execute(query, values)
+        fetched, description = self._execute(query, values)
 
         # If formater in parameter
         if formater is not None:
@@ -325,7 +322,7 @@ class DBConnection(object):
                 last_state.get(u"fields")
             )
 
-        return headers, fetched
+        return [i[0] for i in description], fetched
 
     def insert(self, table, fields, positional_values, values):
         cursor = self._db.cursor()
@@ -340,4 +337,6 @@ class DBConnection(object):
         cursor.connection.commit()
         return cursor.lastrowid
 
+    def export(self, headers, rows):
+        pass
 

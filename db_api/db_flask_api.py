@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
-from flask import jsonify
+from flask import jsonify, make_response
 import json
 
 
@@ -15,9 +15,12 @@ class DBFlaskAPI(object):
             db_name,
             db_connection_def,
             db_parser_def,
-            db_host
+            db_host,
+            db_export_def
     ):
-        self._db_api_def = db_api_def
+        self.__db_parser_def = db_parser_def
+        self.__db_api_def = db_api_def
+
         self.db_connection = db_connection_def(
             db_api_def=db_api_def,
             user=db_user,
@@ -26,7 +29,59 @@ class DBFlaskAPI(object):
             host=db_host
         )
 
-        self.__db_parser_def = db_parser_def
+        self.db_export = db_export_def()
+
+    def handle_export(self, request, table):
+        code = 200
+
+        params = {
+            u"pipeline": None,
+            u"filters": None,
+            u"options": {}
+        }
+
+        for key in params:
+            var = request.args.get(key, None)
+            if var is not None:
+                params[key] = json.loads(var, encoding=u"utf-8")
+
+        db_parser = self.__db_parser_def(
+            table=table,
+            columns=self.db_connection.get_columns(table)
+        )
+        base_state = db_parser.generate_base_state()
+        if params[u"pipeline"]:
+            stages = self._pipeline_to_stages(
+                db_parser=db_parser,
+                pipeline=params[u"pipeline"]
+            )
+
+            headers, rows = self.db_connection.aggregate(
+                table,
+                base_state=base_state,
+                stages=stages
+            )
+
+        elif params[u"filters"]:
+            filters = db_parser.parse_match(match=params[u"filters"], from_state=base_state)
+            headers, rows = self.db_connection.select(
+                fields=base_state.get(u"fields"),
+                table=table,
+                joins=base_state.get(u"joins"),
+                where=filters,
+                first=request.args.get(u"first"),
+                nb=request.args.get(u"nb")
+            )
+        else:
+            return jsonify({
+                u"Unrecognized export"
+            }), 422
+
+        export = self.db_export.export(headers, rows, params[u"options"])
+        output = make_response(export.getvalue())
+        output.headers[U"Content-Disposition"] = U"attachment; filename=export.csv"
+        output.headers[U"Content-type"] = U"text/csv"
+        return output, code
 
     def handle_description(self, request, table):
         code = 200
@@ -48,22 +103,7 @@ class DBFlaskAPI(object):
 
         return jsonify(result), code
 
-    def handle_aggregation(self, request, table):
-        result = {}
-
-        code = 200
-        db_parser = self.__db_parser_def(
-            table=table,
-            columns=self.db_connection.get_columns(table)
-        )
-
-        # Get pipeline from payload or url arg
-        data = request.data
-        if data is not None and data != u"":
-            data = json.loads(data, encoding=u"utf-8")
-        pipeline = json.loads(request.args.get(u'pipeline', u"[]")) or data.get(u"pipeline", [])
-
-
+    def _pipeline_to_stages(self, db_parser, pipeline):
         base_state = db_parser.generate_base_state()
         stages = []
         custom_state = None
@@ -107,12 +147,35 @@ class DBFlaskAPI(object):
                 # Group alter the state. Use custom one
                 custom_state = ret[u'state']
 
+        return stages
+
+    def handle_aggregation(self, request, table):
+        result = {}
+
+        code = 200
+        db_parser = self.__db_parser_def(
+            table=table,
+            columns=self.db_connection.get_columns(table)
+        )
+
+        # Get pipeline from payload or url arg
+        data = request.data
+        if data is not None and data != u"":
+            data = json.loads(data, encoding=u"utf-8")
+        pipeline = json.loads(request.args.get(u'pipeline', u"[]")) or data.get(u"pipeline", [])
+
+        stages = self._pipeline_to_stages(
+            db_parser=db_parser,
+            pipeline=pipeline
+        )
+
         items = self.db_connection.aggregate(
             table,
-            base_state,
+            db_parser.generate_base_state(),
             stages,
             formater=db_parser.rows_to_formated
         )
+
         result[u'items'] = items
 
         return jsonify(result), code
@@ -127,6 +190,7 @@ class DBFlaskAPI(object):
         )
 
         filters = request.args.get(u'filters')
+        export_to = request.args.get(u'export_to', None)
         data = request.data
 
         if filters is not None:
@@ -215,11 +279,10 @@ class DBFlaskAPI(object):
             }
             code = 422
 
-        except self._db_api_def.OperationalError as e:
+        except self.__db_api_def.OperationalError as e:
             result = {
                 u"message": unicode(e[1])
             }
             code = 422
-
 
         return jsonify(result), code

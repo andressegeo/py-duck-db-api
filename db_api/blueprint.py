@@ -3,6 +3,7 @@
 from db_flask_api import DBFlaskAPI
 from db_connection import DBConnection
 from db_parser import DBParser
+from db_export import DBExport
 from flask import Blueprint, request
 
 
@@ -31,10 +32,16 @@ def construct_db_api_blueprint(
         db_name=db_name,
         db_connection_def=DBConnection,
         db_parser_def=DBParser,
-        db_host=db_host
+        db_host=db_host,
+        db_export_def=DBExport
     )
 
     db_api_blueprint = Blueprint(u'db_api', __name__)
+
+    # Example : http://localhost:5000/api/db/hour/export?pipeline=[{"$project":{"user_email":"$affected_to.email","id":1}}]&options={"type":"csv","delimiter":";"}
+    @db_api_blueprint.route(u'/db/<string:table>/export', methods=[u"GET"])
+    def table_aggregation_export(table):
+        return db_flask_api.handle_export(request, table=table)
 
     @db_api_blueprint.route(u'/db/<string:table>/aggregation', methods=[u"GET", u"POST"])
     def table_aggregation(table):

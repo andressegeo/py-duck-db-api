@@ -313,7 +313,8 @@ class DBParser(object):
         for key in project:
             if project[key] == 1:
                 field = self.find_col_field(key)
-                ret[u'statements'].append(u"`" + field + u"`")
+                ret[u'statements'].append(u"`" + field + u"` AS %s")
+                ret[u'values'].append(key)
                 ret[u'state'][u"fields"].append({
                     u"alias": key,
                     u"formated": key
@@ -327,8 +328,6 @@ class DBParser(object):
                     u"alias": key,
                     u"formated": key
                 })
-            else:
-                pass
 
         ret[u'statements'] = u", ".join(ret[u'statements'])
         return ret
@@ -344,6 +343,7 @@ class DBParser(object):
         return None
 
     def parse_group(self, group, from_state):
+
         self._last_state = from_state
         ret = {
             u"fields": [],
