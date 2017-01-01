@@ -12,54 +12,63 @@ def mock_columns():
             "type": "int(11)",
             "alias": "hour",
             "table_name": "hour",
+            "null": False,
             "column_name": "id"
         },
         {
             "type": "varchar(45)",
             "alias": "hour",
             "table_name": "hour",
+            "null": False,
             "column_name": "issue"
         },
         {
             "type": "datetime",
             "alias": "hour",
             "table_name": "hour",
+            "null": False,
             "column_name": "started_at"
         },
         {
             "type": "int(11)",
             "alias": "hour",
             "table_name": "hour",
+            "null": False,
             "column_name": "minutes"
         },
         {
             "type": "varchar(255)",
             "alias": "hour",
             "table_name": "hour",
+            "null": True,
             "column_name": "comments"
         },
         {
             "type": "int(11)",
             "alias": "project",
             "table_name": "project",
+            "null": False,
             "column_name": "id"
         },
         {
             "type": "varchar(45)",
             "alias": "project",
             "table_name": "project",
+            "null": False,
             "column_name": "name"
         },
         {
             "type": "int(11)",
             "alias": "client",
             "table_name": "client",
+            "null": False,
             "column_name": "id"
         },
         {
             "type": "varchar(45)",
             "alias": "client",
             "table_name": "client",
+            "null": False,
             "column_name": "name"
         },
         {
@@ -84,19 +93,22 @@ def mock_columns():
             "type": "int(11)",
             "alias": "affected_to",
             "table_name": "user",
-            "column_name": "id"
+            "column_name": "id",
+            "null": False,
         },
         {
             "type": "varchar(255)",
             "alias": "affected_to",
             "table_name": "user",
-            "column_name": "email"
+            "column_name": "email",
+            "null": False
         },
         {
             "type": "varchar(255)",
             "alias": "affected_to",
             "table_name": "user",
-            "column_name": "name"
+            "column_name": "name",
+            "null": False
         },
         {
             "referenced_alias": "affected_to",
@@ -105,25 +117,29 @@ def mock_columns():
             "alias": "hour",
             "table_name": "hour",
             "type": "int(11)",
-            "column_name": "affected_to"
+            "column_name": "affected_to",
+            "null": False
         },
         {
             "type": "int(11)",
             "alias": "created_by",
             "table_name": "user",
-            "column_name": "id"
+            "column_name": "id",
+            "null": False
         },
         {
             "type": "varchar(255)",
             "alias": "created_by",
             "table_name": "user",
-            "column_name": "email"
+            "column_name": "email",
+            "null": False
         },
         {
             "type": "varchar(255)",
             "alias": "created_by",
             "table_name": "user",
-            "column_name": "name"
+            "column_name": "name",
+            "null": False
         },
         {
             "referenced_alias": "created_by",
@@ -132,7 +148,8 @@ def mock_columns():
             "alias": "hour",
             "table_name": "hour",
             "type": "int(11)",
-            "column_name": "created_by"
+            "column_name": "created_by",
+            "null": False
         }
     ]
 
@@ -390,31 +407,36 @@ def test_generate_description(db_parser):
             "type": "int(11)",
             "alias": "project",
             "table_name": "project",
-            "column_name": "id"
+            "column_name": "id",
+            "null": False
         },
         {
             "type": "varchar(45)",
             "alias": "project",
             "table_name": "project",
-            "column_name": "name"
+            "column_name": "name",
+            "null": True
         },
         {
             "type": "int(11)",
             "alias": "client",
             "table_name": "client",
-            "column_name": "id"
+            "column_name": "id",
+            "null": False
         },
         {
             "type": "datetime",
             "alias": "project",
             "table_name": "project",
-            "column_name": "created_at"
+            "column_name": "created_at",
+            "null": False
         },
         {
             "type": "varchar(45)",
             "alias": "client",
             "table_name": "client",
-            "column_name": "name"
+            "column_name": "name",
+            "null": False
         },
         {
             "referenced_alias": "client",
@@ -423,7 +445,8 @@ def test_generate_description(db_parser):
             "alias": "project",
             "table_name": "project",
             "type": "int(11)",
-            "column_name": "client"
+            "column_name": "client",
+            "null": False
         }
     ]
 
@@ -432,15 +455,18 @@ def test_generate_description(db_parser):
     assert ret == [
         {
             u"name": u"id",
-            u"type": u"number"
+            u"type": u"number",
+            u"required": True
         },
         {
             u"name": u"name",
-            u"type": u"text"
+            u"type": u"text",
+            u"required": False
         },
         {
             u"name": u"created_at",
-            u"type": u"timestamp"
+            u"type": u"timestamp",
+            u"required": True
         },
         {
             u"name": u"client",
@@ -448,7 +474,8 @@ def test_generate_description(db_parser):
             u"deduceFrom": {
                 u"source": u"client",
                 u"column": u"id"
-            }
+            },
+            u"required": True
         }
     ]
 

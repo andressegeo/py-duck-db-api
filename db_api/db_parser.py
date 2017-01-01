@@ -91,6 +91,7 @@ class DBParser(object):
         # Return
         return base_state
 
+
     def generate_column_description(self, table, columns):
         types_desc = {
             u"number": [u"int", u"float"],
@@ -101,7 +102,6 @@ class DBParser(object):
         ret = []
 
         for col in [col for col in columns if col[u"table_name"] == table]:
-
             matching_type = None
 
             for key in types_desc:
@@ -115,14 +115,15 @@ class DBParser(object):
 
             col_desc = {
                 u"name": col.get(u'column_name'),
+                u"required": not col.get(u"null"),
                 u"type": matching_type
             }
 
             if col.get(u'key', u"") != u"":
-                col_desc['key'] = col.get(u'key')
+                col_desc[u'key'] = col.get(u'key')
 
             if col.get(u'extra', u"") != u"":
-                col_desc['extra'] = col.get(u'extra')
+                col_desc[u'extra'] = col.get(u'extra')
 
             if u"referenced_table_name" in col:
                 col_desc[u'deduceFrom'] = {
