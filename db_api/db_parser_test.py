@@ -489,9 +489,8 @@ def test_parse_project(db_parser):
         },
         from_state=db_parser.generate_base_state()
     )
-
-    assert ret[u"statements"] == u"`hour.issue` AS %s, `hour.id`, `affected_to.email` AS %s"
-    assert ret[u'values'] == [u"issue_formated", u"user_email"]
+    assert ret[u"statements"] == u"`hour.issue` AS %s, `hour.id` AS %s, `affected_to.email` AS %s"
+    assert ret[u'values'] == [u"issue_formated", u"id", u"user_email"]
 
 
 def test_parse_group(db_parser):
