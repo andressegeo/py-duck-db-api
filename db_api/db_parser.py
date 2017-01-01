@@ -282,12 +282,12 @@ class DBParser(object):
 
                 elif key in self._RECURSIVE_OPERATORS:
 
-
                     ret = self.parse_match(
                         filter[key],
                         from_state=from_state,
                         operator=self._RECURSIVE_OPERATORS[key],
-                        parent=key
+                        parent=key,
+                        filter_with_alias=filter_with_alias
                     )
 
                     where[u"statements"].append(u"(" + ret[u"statements"] + u")")

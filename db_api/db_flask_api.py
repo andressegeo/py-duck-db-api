@@ -245,6 +245,7 @@ class DBFlaskAPI(object):
                     from_state=base_state,
                     filter_with_alias=False
                 )
+
                 if filters.get(u"statements") == u"":
                     raise ValueError(u"You need to set a proper filter to delete (safe mode)")
 
