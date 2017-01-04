@@ -134,6 +134,8 @@ class DBConnection(object):
                     )
                     break
             columns.append(column)
+
+
         return columns
 
     @staticmethod

@@ -101,14 +101,25 @@ class DBParser(object):
 
         ret = []
 
-        for col in [col for col in columns if col[u"table_name"] == table]:
+        def get_machine_type(col):
             matching_type = None
-
             for key in types_desc:
                 for db_type in types_desc[key]:
                     if db_type in col.get(u'type'):
                         matching_type = key
                         break
+            return matching_type
+
+        def set_append_and_extra(col, col_desc):
+            if col.get(u'key', u"") != u"":
+                col_desc[u'key'] = col.get(u'key')
+
+            if col.get(u'extra', u"") != u"":
+                col_desc[u'extra'] = col.get(u'extra')
+            return col_desc
+
+        for col in [col for col in columns if col[u"table_name"] == table]:
+            matching_type = get_machine_type(col)
 
             if matching_type is None:
                 raise ValueError(u"No matching types")
@@ -119,16 +130,20 @@ class DBParser(object):
                 u"type": matching_type
             }
 
-            if col.get(u'key', u"") != u"":
-                col_desc[u'key'] = col.get(u'key')
-
-            if col.get(u'extra', u"") != u"":
-                col_desc[u'extra'] = col.get(u'extra')
+            set_append_and_extra(col, col_desc)
 
             if u"referenced_table_name" in col:
-                col_desc[u'deduceFrom'] = {
-                    u"source": col.get(u"referenced_table_name"),
-                    u"column": [col.get(u"referenced_column_name")][0]
+                nested_fields = [
+                    set_append_and_extra(nested_col, {
+                        u"name": nested_col.get(u'column_name'),
+                        u"required": not nested_col.get(u"null"),
+                        u"type": get_machine_type(nested_col)
+                    }) for nested_col in columns
+                    if col_desc.get(u"name") == nested_col.get(u'alias')
+                    ]
+
+                col_desc[u'nestedDescription'] = {
+                    u"fields": nested_fields
                 }
 
             ret += [col_desc]

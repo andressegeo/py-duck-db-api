@@ -404,80 +404,109 @@ def test_generate_description(db_parser):
 
     columns = [
         {
-            "type": "int(11)",
-            "alias": "project",
-            "table_name": "project",
-            "column_name": "id",
-            "null": False
+            u"extra": u"auto_increment",
+            u"alias": u"project",
+            u"table_name": u"project",
+            u"key": u"pri",
+            u"null": False,
+            u"type": u"int(11)",
+            u"column_name": u"id"
         },
         {
-            "type": "varchar(45)",
-            "alias": "project",
-            "table_name": "project",
-            "column_name": "name",
-            "null": True
+            u"extra": u"",
+            u"alias": u"project",
+            u"table_name": u"project",
+            u"key": u"",
+            u"null": True,
+            u"type": u"varchar(45)",
+            u"column_name": u"name"
         },
         {
-            "type": "int(11)",
-            "alias": "client",
-            "table_name": "client",
-            "column_name": "id",
-            "null": False
+            u"extra": u"auto_increment",
+            u"alias": u"client",
+            u"table_name": u"client",
+            u"key": u"pri",
+            u"null": False,
+            u"type": u"int(11)",
+            u"column_name": u"id"
         },
         {
-            "type": "datetime",
-            "alias": "project",
-            "table_name": "project",
-            "column_name": "created_at",
-            "null": False
+            u"extra": u"",
+            u"alias": u"client",
+            u"table_name": u"client",
+            u"key": u"",
+            u"null": False,
+            u"type": u"varchar(45)",
+            u"column_name": u"name"
         },
         {
-            "type": "varchar(45)",
-            "alias": "client",
-            "table_name": "client",
-            "column_name": "name",
-            "null": False
+            u"extra": u"",
+            u"referenced_alias": u"client",
+            u"referenced_column_name": u"id",
+            u"referenced_table_name": u"client",
+            u"alias": u"project",
+            u"table_name": u"project",
+            u"key": u"mul",
+            u"null": False,
+            u"type": u"int(11)",
+            u"column_name": u"client"
         },
         {
-            "referenced_alias": "client",
-            "referenced_column_name": "id",
-            "referenced_table_name": "client",
-            "alias": "project",
-            "table_name": "project",
-            "type": "int(11)",
-            "column_name": "client",
-            "null": False
+            u"extra": u"",
+            u"alias": u"project",
+            u"table_name": u"project",
+            u"key": u"",
+            u"null": False,
+            u"type": u"int(11)",
+            u"column_name": u"provisioned_hours"
         }
     ]
 
     ret = db_parser.generate_column_description(columns=columns, table=u"project")
-
+    print(json.dumps(ret, indent=4))
+    print(json.dumps(ret, indent=4))
     assert ret == [
         {
+            u"required": True,
+            u"type": u"number",
             u"name": u"id",
-            u"type": u"number",
-            u"required": True
+            u"key": u"pri",
+            u"extra": u"auto_increment"
         },
         {
-            u"name": u"name",
+            u"required": False,
             u"type": u"text",
-            u"required": False
+            u"name": u"name"
         },
         {
-            u"name": u"created_at",
-            u"type": u"timestamp",
-            u"required": True
-        },
-        {
-            u"name": u"client",
-            u"type": u"number",
-            u"deduceFrom": {
-                u"source": u"client",
-                u"column": u"id"
+            u"nestedDescription": {
+                u"fields": [
+                    {
+                        u"required": True,
+                        u"type": u"number",
+                        u"name": u"id",
+                        u"key": u"pri",
+                        u"extra": u"auto_increment"
+                    },
+                    {
+                        u"required": True,
+                        u"type": u"text",
+                        u"name": u"name"
+                    }
+                ]
             },
-            u"required": True
+            u"required": True,
+            u"type": u"number",
+            u"name": u"client",
+            u"key": u"mul"
+        },
+        {
+            u"required": True,
+            u"type": u"number",
+            u"name": u"provisioned_hours"
         }
     ]
+
 
 
 def test_parse_project(db_parser):
