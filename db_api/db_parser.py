@@ -143,7 +143,8 @@ class DBParser(object):
                     ]
 
                 col_desc[u'nestedDescription'] = {
-                    u"fields": nested_fields
+                    u"fields": nested_fields,
+                    u"source": col.get(u"referenced_table_name")
                 }
 
             ret += [col_desc]
