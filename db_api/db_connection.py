@@ -238,7 +238,8 @@ class DBConnection(object):
             table,
             joins,
             where=None,
-            formater=None,
+            formatter=None,
+            order_by=None,
             first=0,
             nb=100
     ):
@@ -252,12 +253,15 @@ class DBConnection(object):
         if where is not None and where[u"statements"] != u"":
             query = u"SELECT * FROM (" + query + u") AS s_0 WHERE " + where[u"statements"]
 
+        if order_by is not None and order_by[u"statements"] != u"":
+            query += u" ORDER BY " + order_by[u"statements"]
+
         query += u" LIMIT %s OFFSET %s"
 
         fetched, description = self._execute(query, (where[u'values'] + [int(nb), int(first)]))
         # If formater in parameter
-        if formater is not None:
-            return formater(
+        if formatter is not None:
+            return formatter(
                 headers,
                 fetched,
                 fields
@@ -315,6 +319,13 @@ class DBConnection(object):
 
                 values = parsed.get(u"values") + values
                 last_state = parsed.get(u"state")
+            elif stage_type == u"orderby":
+                query = u"SELECT * FROM ( {} ) AS s_{}".format(
+                    query,
+                    index + 1
+                )
+                if parsed.get(u"statements", u"") != u"":
+                    query += u" ORDER BY {}".format(parsed.get(u"statements"))
 
         last_state = last_state or base_state
         fetched, description = self._execute(query, values)

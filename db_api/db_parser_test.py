@@ -463,8 +463,7 @@ def test_generate_description(db_parser):
     ]
 
     ret = db_parser.generate_column_description(columns=columns, table=u"project")
-    print(json.dumps(ret, indent=4))
-    print(json.dumps(ret, indent=4))
+
     assert ret == [
         {
             u"required": True,
@@ -508,7 +507,6 @@ def test_generate_description(db_parser):
     ]
 
 
-
 def test_parse_project(db_parser):
 
     ret = db_parser.parse_project(project={
@@ -520,6 +518,17 @@ def test_parse_project(db_parser):
     )
     assert ret[u"statements"] == u"`hour.issue` AS %s, `hour.id` AS %s, `affected_to.email` AS %s"
     assert ret[u'values'] == [u"issue_formated", u"id", u"user_email"]
+
+
+def test_parse_order_by(db_parser):
+    ret = db_parser.parse_order_by(order_by={
+        u"affected_to.email": 1,
+        u"minutes": -1
+    },
+        from_state=db_parser.generate_base_state()
+    )
+
+    assert ret[u"statements"] == u"`affected_to.email` ASC, `hour.minutes` DESC"
 
 
 def test_parse_group(db_parser):

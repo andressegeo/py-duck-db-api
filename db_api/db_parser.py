@@ -359,6 +359,25 @@ class DBParser(object):
                     return field.get(field_key)
         return None
 
+    def parse_order_by(self, order_by, from_state):
+
+        order_by = order_by or {}
+        self._last_state = from_state
+        ret = {
+            u"statements": []
+        }
+
+        for key in order_by:
+            field = self.find_col_field(key)
+            formatted = u"`{}` {}"
+            if order_by[key] == 1:
+                ret[u"statements"].append(formatted.format(field, u"ASC"))
+            elif order_by[key] == -1:
+                ret[u"statements"].append(formatted.format(field, u"DESC"))
+
+        ret[u'statements'] = u", ".join(ret[u'statements'])
+        return ret
+
     def parse_group(self, group, from_state):
 
         self._last_state = from_state

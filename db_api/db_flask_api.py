@@ -146,6 +146,17 @@ class DBFlaskAPI(object):
                 )
                 # Group alter the state. Use custom one
                 custom_state = ret[u'state']
+            elif u"$orderby" in stage:
+                ret = db_parser.parse_order_by(
+                    order_by=stage.get(u"$orderby"),
+                    from_state=custom_state or base_state
+                )
+                stages.append(
+                    {
+                        u"type": u"orderby",
+                        u"parsed": ret
+                    }
+                )
 
         return stages
 
@@ -160,8 +171,11 @@ class DBFlaskAPI(object):
 
         # Get pipeline from payload or url arg
         data = request.data
+
         if data is not None and data != u"":
             data = json.loads(data, encoding=u"utf-8")
+        else:
+            data = { u"pipeline": [] }
         pipeline = json.loads(request.args.get(u'pipeline', u"[]")) or data.get(u"pipeline", [])
 
         stages = self._pipeline_to_stages(
@@ -190,11 +204,15 @@ class DBFlaskAPI(object):
         )
 
         filters = request.args.get(u'filters')
-        export_to = request.args.get(u'export_to', None)
+        order_by = request.args.get(u"order_by")
+        export_to = request.args.get(u'export_to')
         data = request.data
 
         if filters is not None:
             filters = json.loads(filters, encoding=u"utf-8")
+
+        if order_by is not None:
+            order_by = json.loads(order_by, encoding=u"utf-8")
 
         if data is not None and data != u"":
             data = json.loads(data, encoding=u"utf-8")
@@ -203,13 +221,21 @@ class DBFlaskAPI(object):
 
         try:
             if request.method == u"GET":
-                filters = db_parser.parse_match(match=filters, from_state=base_state)
+                filters = db_parser.parse_match(
+                    match=filters,
+                    from_state=base_state
+                )
+                order_by = db_parser.parse_order_by(
+                    order_by=order_by,
+                    from_state=base_state
+                )
                 items = self.db_connection.select(
                     fields=base_state.get(u"fields"),
                     table=table,
                     joins=base_state.get(u"joins"),
                     where=filters,
-                    formater=db_parser.rows_to_formated,
+                    formatter=db_parser.rows_to_formated,
+                    order_by=order_by,
                     first=request.args.get(u"first"),
                     nb=request.args.get(u"nb")
                 )
