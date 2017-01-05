@@ -50,7 +50,7 @@ class DBFlaskAPI(object):
             columns=self.db_connection.get_columns(table)
         )
         base_state = db_parser.generate_base_state()
-        if params[u"pipeline"]:
+        if params[u"pipeline"] is not None:
             stages = self._pipeline_to_stages(
                 db_parser=db_parser,
                 pipeline=params[u"pipeline"]
@@ -62,7 +62,7 @@ class DBFlaskAPI(object):
                 stages=stages
             )
 
-        elif params[u"filters"]:
+        elif params[u"filters"] is not None:
             filters = db_parser.parse_match(match=params[u"filters"], from_state=base_state)
             headers, rows = self.db_connection.select(
                 fields=base_state.get(u"fields"),
@@ -74,7 +74,7 @@ class DBFlaskAPI(object):
             )
         else:
             return jsonify({
-                u"Unrecognized export"
+                u"message": u"Unrecognized export"
             }), 422
 
         export = self.db_export.export(headers, rows, params[u"options"])
