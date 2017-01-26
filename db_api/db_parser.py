@@ -33,6 +33,17 @@ class DBParser(object):
         self._table = table
         self._last_state = None
 
+    def manage_duplications(self, base_name, register):
+        index = 0
+        register = register or {}
+        if base_name in register:
+            while u"{}_{}".format(base_name, index) in register:
+                index +=1
+            base_name = u"{}_{}".format(base_name, index)
+
+        register[base_name] = True
+        return base_name, register
+
     def generate_base_state(self, parent_table=None, parent_path=None):
         """
         This method generate a set of variables, that can be seen as dependencies, used by others function
@@ -88,9 +99,14 @@ class DBParser(object):
             u"joins": joins,
             u"type": u"base"
         }
+        if parent_path is None:
+            register = {}
+            for join in base_state.get(u"joins", []):
+                join[u'referenced_alias'], register = self.manage_duplications(join.get(u"referenced_alias"), register)
+
+        print(json.dumps(base_state, indent=4))
         # Return
         return base_state
-
 
     def generate_column_description(self, table, columns):
         types_desc = {
