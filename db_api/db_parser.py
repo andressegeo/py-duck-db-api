@@ -33,7 +33,7 @@ class DBParser(object):
         self._table = table
         self._last_state = None
 
-    def manage_duplications(self, base_name, register):
+    def manage_joins_duplications(self, base_name, register):
         index = 0
         register = register or {}
         if base_name in register:
@@ -42,6 +42,14 @@ class DBParser(object):
             base_name = u"{}_{}".format(base_name, index)
 
         register[base_name] = True
+        return base_name, register
+
+    def manage_fields_duplications(self, base_name, formatted, register):
+        index = 0
+        register = register or {}
+        if formatted in register:
+            register[(formatted, base_name)] = True
+
         return base_name, register
 
     def generate_base_state(self, parent_table=None, parent_path=None):
@@ -65,11 +73,14 @@ class DBParser(object):
         # For each column which doesn't have any relation
         for col in [col for col in self._base_columns if
                     col.get(u"alias", col.get(u"table_name")) == alias and u"referenced_table_name" not in col]:
-            fields.append({
-                u"db": u"`" + col.get(u"alias") + u"`.`" + col.get(u"column_name") + u"`",
-                u"formated": u".".join(j_tab + [col.get(u"column_name")]),
-                u"alias": col.get(u"alias") + u"." + col.get(u"column_name")
-            })
+
+            formatted = u".".join(j_tab + [col.get(u"column_name")])
+            if len([field for field in fields if field.get(u"formated") == formatted]) != 1:
+                fields.append({
+                    u"db": u"`" + col.get(u"alias") + u"`.`" + col.get(u"column_name") + u"`",
+                    u"formated": u".".join(j_tab + [col.get(u"column_name")]),
+                    u"alias": col.get(u"alias") + u"." + col.get(u"column_name")
+                })
 
         # For each column which has a relation
         for ref_col in [
@@ -94,17 +105,33 @@ class DBParser(object):
                 u"alias": field.get(u"alias")
             } for field in fields]
 
+
+        if parent_path is None:
+            register = {
+                u"fields": {},
+                u"joins": {}
+            }
+            for join in joins:
+                join[u'referenced_alias'], register[u'joins'] = self.manage_joins_duplications(join.get(u"referenced_alias"), register[u'joins'])
+
+
+            for field in fields:
+                field[u'db'], register[u'fields'] = self.manage_fields_duplications(
+                    field.get(u'db'),
+                    field.get(u'formated'),
+                    register.get(u'fields')
+                )
+            print(json.dumps(register, indent=4))
+
         base_state = {
             u"fields": fields,
             u"joins": joins,
             u"type": u"base"
         }
-        if parent_path is None:
-            register = {}
-            for join in base_state.get(u"joins", []):
-                join[u'referenced_alias'], register = self.manage_duplications(join.get(u"referenced_alias"), register)
 
-        print(json.dumps(base_state, indent=4))
+        if parent_path is None:
+            print(json.dumps(base_state, indent=4))
+
         # Return
         return base_state
 
