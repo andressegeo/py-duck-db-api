@@ -52,6 +52,25 @@ class DBParser(object):
 
         return base_name, register
 
+    def determine_type(self, col):
+        types_desc = {
+            u"number": [u"int", u"float"],
+            u"text": [u"varchar", u"text"],
+            u"timestamp": [u"date"]
+        }
+
+        def get_machine_type(col):
+            matching_type = None
+            for key in types_desc:
+                for db_type in types_desc[key]:
+                    if db_type in col.get(u'type'):
+                        matching_type = key
+                        break
+            return matching_type
+
+        return get_machine_type(col)
+
+
     def generate_base_state(self, parent_table=None, parent_path=None):
         """
         This method generate a set of variables, that can be seen as dependencies, used by others function
@@ -79,7 +98,8 @@ class DBParser(object):
                 fields.append({
                     u"db": u"`" + col.get(u"alias") + u"`.`" + col.get(u"column_name") + u"`",
                     u"formated": u".".join(j_tab + [col.get(u"column_name")]),
-                    u"alias": col.get(u"alias") + u"." + col.get(u"column_name")
+                    u"alias": col.get(u"alias") + u"." + col.get(u"column_name"),
+                    u"type": self.determine_type(col)
                 })
 
         # For each column which has a relation
@@ -102,7 +122,8 @@ class DBParser(object):
             {
                 u"formated": field.get(u"formated"),
                 u"db": field.get(u"db"),
-                u"alias": field.get(u"alias")
+                u"alias": field.get(u"alias"),
+                u"type": field.get(u"type")
             } for field in fields]
 
 
@@ -121,7 +142,6 @@ class DBParser(object):
                     field.get(u'formated'),
                     register.get(u'fields')
                 )
-            print(json.dumps(register, indent=4))
 
         base_state = {
             u"fields": fields,
@@ -278,13 +298,18 @@ class DBParser(object):
         return [column for column in self._base_columns
             if u"referenced_table_name" in column]
 
+    def get_field(self, formatted):
+        for col in self._last_state.get(u"fields", []):
+            if col.get(u"formated") == formatted:
+                return col
+        return None
+
     def parse_match(
             self,
             match,
             from_state,
             operator=u"AND",
-            parent=None,
-            filter_with_alias=True
+            parent=None
     ):
         self._last_state = from_state
 
@@ -299,30 +324,17 @@ class DBParser(object):
         }
 
         for filter in match:
-
             for key in filter:
                 # If key is an operator
-                if self.is_field(key):
-
-                    field = self.find_col_field(key)
-                    value = self.get_wrapped_values(
-                        [field],
-                        [filter[key]]
+                field = self.get_field(formatted=key)
+                if field is not None and type(field) is not dict:
+                    value = self.get_wrapped_value(
+                        filter[key],
+                        field.get(u"type")
                     )
-                    if not filter_with_alias:
-                        field = self.find_col_field(key, field_key=u"db")
-                    else:
-                        field = u"`" + field + u"`"
 
-                    if type(filter[key]) in [unicode, str, int, float]:
-                        where[u"statements"].append(field + u" = " + value)
-                        where[u"values"].append(filter[key])
-
-                    elif type(filter[key]) is dict:
-
-                        ret = self.parse_match(filter[key], parent=key, from_state=from_state)
-                        where[u"statements"].append(ret[u"statements"])
-                        where[u"values"] += ret[u"values"]
+                    where[u"statements"].append(u"`{}` = {}".format(field.get(u"formated"), str(value)))
+                    where[u"values"].append(filter[key])
 
                 elif key in self._OPERATORS and parent is not None:
 
@@ -346,8 +358,7 @@ class DBParser(object):
                         filter[key],
                         from_state=from_state,
                         operator=self._RECURSIVE_OPERATORS[key],
-                        parent=key,
-                        filter_with_alias=filter_with_alias
+                        parent=key
                     )
 
                     where[u"statements"].append(u"(" + ret[u"statements"] + u")")
@@ -358,7 +369,7 @@ class DBParser(object):
         return where
 
     def is_field(self, key):
-        return self.find_col_field(key) is not None
+        return self.get_alias_from_j_path(key) is not None
 
     def parse_project(self, project, from_state=None):
         self._last_state = from_state
@@ -501,31 +512,11 @@ class DBParser(object):
 
         return output
 
-    def get_wrapped_values(self, headers, values):
+    def get_wrapped_value(self, value, typ):
+        if typ == u"timestamp":
+            value = u"FROM_UNIXTIME(%s)"
+        return u"%s"
 
-        output = []
-
-        for index, header in enumerate(headers):
-            if self._last_state is not None and self._last_state.get(u"type", u"") != u"base":
-                columns = self._last_state.get(u"fields", [])
-                for column in columns:
-                    if header == column.get(u"alias"):
-                        output.append(u"%s")
-                        break
-            else:
-                # If no base state, parse from columns
-                for column in self._base_columns:
-
-                    sep = u"."
-                    if ((column.get(u"alias", column.get(u"table_name")) + sep + column[u"column_name"])
-                            == header):
-
-                        if u"datetime" in column.get(u"type", u"") and type(values[index]) in [int, float]:
-                            output.append(u"FROM_UNIXTIME(%s)")
-                        else:
-                            output.append(u"%s")
-                        break
-        return u", ".join(output)
 
     def parse_update(self, data):
         self._last_state = self.generate_base_state()

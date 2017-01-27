@@ -6,7 +6,7 @@ from db_parser import DBParser
 
 
 @pytest.fixture(scope=u"function")
-def mock_columns():
+def mock_columns_hours():
     return [
         {
             "type": "int(11)",
@@ -155,10 +155,10 @@ def mock_columns():
 
 
 @pytest.fixture(scope=u"function")
-def db_parser(mock_columns):
+def db_parser(mock_columns_hours):
     db_parser = DBParser(
         table=u"hour",
-        columns=mock_columns
+        columns=mock_columns_hours
     )
 
     return db_parser

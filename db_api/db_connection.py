@@ -160,7 +160,7 @@ class DBConnection(object):
             for ref in joins
         ]
         query = u"SELECT " + u", ".join(headers) + u" FROM " + table + u" " + (u" ".join(joins))
-        print(query)
+
         return headers, query
 
     def update(self, table, joins, update, where):

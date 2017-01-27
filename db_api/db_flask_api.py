@@ -203,6 +203,8 @@ class DBFlaskAPI(object):
             columns=self.db_connection.get_columns(table)
         )
 
+
+
         filters = request.args.get(u'filters')
         order_by = request.args.get(u"order_by")
         export_to = request.args.get(u'export_to')
@@ -225,6 +227,8 @@ class DBFlaskAPI(object):
                     match=filters,
                     from_state=base_state
                 )
+
+                return jsonify(filters), 200
                 order_by = db_parser.parse_order_by(
                     order_by=order_by,
                     from_state=base_state
