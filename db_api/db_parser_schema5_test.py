@@ -98,4 +98,5 @@ def test_parse_match(db_parser, mock_base_state):
 
     to_check = [u'`contact.id` = %s', u"AND", u'`contact.id` >= %s']
     for val in to_check:
+        print(val)
         assert val in ret.get(u"statements", [])

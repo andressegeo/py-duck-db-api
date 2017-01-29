@@ -335,8 +335,6 @@ class DBParser(object):
                         field.get(u"type")
                     )
 
-
-
                     if type(filter[key]) is dict:
                         ret = self.parse_match(filter[key], parent=field, from_state=from_state)
                         where[u"statements"].append(ret[u"statements"])
@@ -350,7 +348,7 @@ class DBParser(object):
                     field = self.get_field(formatted=parent.get(u"formated"))
                     value = self.get_wrapped_value(filter[key], field.get(u"type"))
 
-                    where[u"statements"].append(u"`{}` {} `{}`".format(
+                    where[u"statements"].append(u"`{}` {} {}".format(
                         field.get(u"formated"),
                         self._OPERATORS[key],
                         str(value)
@@ -358,7 +356,6 @@ class DBParser(object):
                     )
 
                     where[u"values"].append(filter[key])
-
 
                 elif key in self._RECURSIVE_OPERATORS:
 
