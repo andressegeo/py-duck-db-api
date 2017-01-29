@@ -324,33 +324,41 @@ class DBParser(object):
         }
 
         for filter in match:
+
             for key in filter:
                 # If key is an operator
                 field = self.get_field(formatted=key)
-                if field is not None and type(field) is not dict:
+                if field is not None:
+
                     value = self.get_wrapped_value(
                         filter[key],
                         field.get(u"type")
                     )
 
-                    where[u"statements"].append(u"`{}` = {}".format(field.get(u"formated"), str(value)))
-                    where[u"values"].append(filter[key])
+
+
+                    if type(filter[key]) is dict:
+                        ret = self.parse_match(filter[key], parent=field, from_state=from_state)
+                        where[u"statements"].append(ret[u"statements"])
+                        where[u"values"] += ret[u"values"]
+                    else:
+                        where[u"statements"].append(u"`{}` = {}".format(field.get(u"formated"), str(value)))
+                        where[u"values"].append(filter[key])
 
                 elif key in self._OPERATORS and parent is not None:
 
-                    field = self.find_col_field(parent)
-                    value = self.get_wrapped_values(
-                        [field],
-                        [filter[key]]
+                    field = self.get_field(formatted=parent.get(u"formated"))
+                    value = self.get_wrapped_value(filter[key], field.get(u"type"))
+
+                    where[u"statements"].append(u"`{}` {} `{}`".format(
+                        field.get(u"formated"),
+                        self._OPERATORS[key],
+                        str(value)
+                        )
                     )
 
-                    if not filter_with_alias:
-                        field = self.find_col_field(key, field_key=u"db")
-                    else:
-                        field = u"`" + field + u"`"
-
-                    where[u"statements"].append(field + u" " + self._OPERATORS[key] + u" " + value)
                     where[u"values"].append(filter[key])
+
 
                 elif key in self._RECURSIVE_OPERATORS:
 
