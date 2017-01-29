@@ -64,21 +64,18 @@ class DBConnection(object):
 
     def get_referenced(self, table):
         cursor = self._db.cursor()
-
         query = u"""
-        SELECT
-        TABLE_NAME,
-        COLUMN_NAME,
-        REFERENCED_TABLE_NAME,
-        REFERENCED_COLUMN_NAME
-        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-        WHERE TABLE_SCHEMA = %s
-        AND TABLE_NAME = %s
-        AND REFERENCED_TABLE_NAME IS NOT NULL
-        """
-
+                SELECT
+                TABLE_NAME,
+                COLUMN_NAME,
+                REFERENCED_TABLE_NAME,
+                REFERENCED_COLUMN_NAME
+                FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+                WHERE TABLE_SCHEMA = %s
+                AND TABLE_NAME = %s
+                AND REFERENCED_TABLE_NAME IS NOT NULL
+                """
         fetched, _ = self._execute(query, values=(self._database, table))
-
         referenced = [
             {
                 u"table_name": constraint[0],
@@ -89,11 +86,45 @@ class DBConnection(object):
             }
             for constraint in fetched
             ]
-
         for ref in referenced:
             referenced += self.get_referenced(ref[u"referenced_table_name"])
-
         return referenced
+
+    def get_columns(self, table, alias=None):
+        referenced = self.get_referenced(table)
+        query = u"""
+                DESCRIBE
+                """ + table + """"""
+        fetched, _ = self._execute(query)
+        columns = []
+        # For each row
+        for row in fetched:
+            column = {
+                u"table_name": table,
+                u"column_name": row[0],
+                u"type": row[1],
+                u"null": row[2] == u"YES",
+                u"key": row[3].lower(),
+                u"extra": row[5].lower()
+            }
+            if alias is not None:
+                column[u"alias"] = alias
+            else:
+                column[u"alias"] = table
+            # If reference found, add it
+            for ref in referenced:
+                if (
+                                ref.get(u"table_name") == column.get(u"table_name")
+                        and ref.get(u"column_name") == column.get(u"column_name")
+                ):
+                    column.update(ref)
+                    columns += self.get_columns(
+                        ref.get(u"referenced_table_name"),
+                        alias=ref.get(u"column_name")
+                    )
+                    break
+            columns.append(column)
+        return columns
 
     def get_columns(self, table, alias=None):
 
@@ -141,25 +172,36 @@ class DBConnection(object):
     @staticmethod
     def _base_query(fields, table, joins):
         headers = [
-            field.get(u"db") +
-            u" AS `" +
-            field.get(u"formated") + u"`"
+            u".".join(field.get(u"path") + [field.get(u"name")])
+            for field in fields
+            ]
+
+        fields = [
+            u"`{}`.`{}` AS `{}`".format(u".".join(field.get(u"path")), field.get(u"name"),
+                                        u".".join(field.get(u"path") + [field.get(u"name")]))
             for field in fields
         ]
 
+
+
         joins = [
             (
-                u"JOIN `" + ref.get(u"referenced_table_name")
-                + u"` AS `" + ref.get(u"referenced_alias")
-                + u"` ON `"
-                + ref.get(u"alias")
-                + u"`.`" + ref.get(u"column_name") + u"` = `"
-                + ref.get(u"referenced_alias")
-                + u"`.`" + ref.get(u"referenced_column_name") + u"`"
+                u"""
+                JOIN `{}`
+                AS `{}`
+                ON `{}`.`{}` = `{}`.`{}`
+                """
+            ).format(
+                ref.get(u"to_table"),
+                u".".join(ref.get(u"to_path")),
+                u".".join(ref.get(u"from_path")),
+                ref.get(u"from_column"),
+                u".".join(ref.get(u"to_path")),
+                ref.get(u"to_column")
             )
             for ref in joins
-        ]
-        query = u"SELECT " + u", ".join(headers) + u" FROM " + table + u" " + (u" ".join(joins))
+            ]
+        query = u"SELECT " + u", ".join(fields) + u" FROM `" + table + u"` " + (u" ".join(joins))
 
         return headers, query
 

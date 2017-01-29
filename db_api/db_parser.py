@@ -33,16 +33,14 @@ class DBParser(object):
         self._table = table
         self._last_state = None
 
-    def manage_joins_duplications(self, base_name, register):
-        index = 0
-        register = register or {}
-        if base_name in register:
-            while u"{}_{}".format(base_name, index) in register:
-                index +=1
-            base_name = u"{}_{}".format(base_name, index)
+    def manage_joins_duplications(self, joins):
+        output = {}
+        for join in joins:
+            if join.get(u"formatted") not in output:
+                output[join.get(u"formatted")] = join
 
-        register[base_name] = True
-        return base_name, register
+        return [output[key] for key in output]
+
 
     def manage_fields_duplications(self, base_name, formatted, register):
         index = 0
@@ -70,6 +68,51 @@ class DBParser(object):
 
         return get_machine_type(col)
 
+    def generate_joins(self, table=None, parent_path=None):
+        table = table or self._table
+        joins = []
+        parent_path = parent_path or [table]
+        for col in [col for col in self._base_columns if u"referenced_table_name" in col and col.get(u"table_name") == table]:
+
+            from_path = parent_path
+            to_path = parent_path + [col.get(u"column_name")]
+            already_processed = len(
+                [join for join in joins if u".".join(join.get(u"to_path")) == u".".join(to_path)]
+            ) > 0
+
+            if not already_processed:
+                joins.append({
+                    u"from_table": col.get(u"table_name"),
+                    u"from_column": col.get(u"column_name"),
+                    u"to_table": col.get(u"referenced_table_name"),
+                    u"to_column": col.get(u"referenced_column_name"),
+                    u"from_path": from_path,
+                    u"to_path": parent_path + [col.get(u"column_name")]
+                })
+
+        updated_joins = []
+        for join in joins:
+            updated_joins += self.generate_joins(
+                join.get(u"to_table"),
+                parent_path + [join.get(u"from_column")]
+            )
+        return joins + updated_joins
+
+    def generate_fields(self, parent_table=None, parent_path=None):
+        unreferenced_cols = [
+            col for col in self._base_columns
+            if u"referenced_table_name" not in col and col.get(u"table_name") == parent_table
+        ]
+
+        return [
+            {
+                u"name": col.get(u"column_name"),
+                u"path": parent_path
+            }
+            for col in unreferenced_cols
+        ]
+
+
     def generate_base_state(self, parent_table=None, parent_path=None):
         """
         This method generate a set of variables, that can be seen as dependencies, used by others function
@@ -81,71 +124,16 @@ class DBParser(object):
         :param set_last_state: Keep in the attribute _last_state.
         :return: dict
         """
-        table = parent_table or self._table
         j_tab = parent_path or []
-        alias = table
-        if parent_path is not None:
-            alias = parent_path[-1]
+        joins = self.generate_joins()
 
-        fields, joins = [], []
-        # For each column which doesn't have any relation
-        for col in [col for col in self._base_columns if
-                    col.get(u"alias", col.get(u"table_name")) == alias and u"referenced_table_name" not in col]:
-
-            formatted = u".".join(j_tab + [col.get(u"column_name")])
-            if len([field for field in fields if field.get(u"formated") == formatted]) != 1:
-                fields.append({
-                    u"db": u"`" + col.get(u"alias") + u"`.`" + col.get(u"column_name") + u"`",
-                    u"formated": formatted,
-                    u"alias": col.get(u"alias") + u"." + col.get(u"column_name"),
-                    u"type": self.determine_type(col)
-                })
-
-        # For each column which has a relation
-        for ref_col in [
-            col for col in self._base_columns
-            if (u"referenced_table_name" in col and col.get(u"table_name") == table)
-            ]:
-            new_parent_path = j_tab + [ref_col.get(u"referenced_alias")]
-            joins += [ref_col]
-
-            ret = self.generate_base_state(
-                parent_table=ref_col.get(u"referenced_table_name"),
-                parent_path=new_parent_path
-            )
-            fields += ret.get(u"fields")
-            joins += ret.get(u"joins")
-
-        # Then format JSON
-        fields = [
-            {
-                u"formated": field.get(u"formated"),
-                u"db": field.get(u"db"),
-                u"alias": field.get(u"alias"),
-                u"type": field.get(u"type")
-            } for field in fields]
-
-
-        if parent_path is None:
-            register = {
-                u"fields": {},
-                u"joins": {}
-            }
-            print(json.dumps(joins, indent=4))
-            for join in joins:
-                join[u'referenced_alias'], register[u'joins'] = self.manage_joins_duplications(join.get(u"referenced_alias"), register[u'joins'])
-
-
-            for field in fields:
-                field[u'db'], register[u'fields'] = self.manage_fields_duplications(
-                    field.get(u'db'),
-                    field.get(u'formated'),
-                    register.get(u'fields')
-                )
+        fields = []
+        for join in joins:
+            fields += self.generate_fields(join.get(u"from_table"), join.get(u"from_path"))
 
         base_state = {
-            u"fields": fields,
-            u"joins": joins,
+            u"fields": sorted(fields, key=lambda x: len(x.get(u"path"))),
+            u"joins": sorted(joins, key=lambda x: len(x.get(u"from_path"))),
             u"type": u"base"
         }
 
@@ -239,7 +227,7 @@ class DBParser(object):
             for index, cell in enumerate(row):
                 key = u"alias"
                 if is_formated:
-                    key = u"formated"
+                    key = u"path"
                 item = self.json_put(item, fields[index][key], self.python_type_to_json(cell))
 
             items.append(item)
