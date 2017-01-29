@@ -70,7 +70,6 @@ class DBParser(object):
 
         return get_machine_type(col)
 
-
     def generate_base_state(self, parent_table=None, parent_path=None):
         """
         This method generate a set of variables, that can be seen as dependencies, used by others function
@@ -97,7 +96,7 @@ class DBParser(object):
             if len([field for field in fields if field.get(u"formated") == formatted]) != 1:
                 fields.append({
                     u"db": u"`" + col.get(u"alias") + u"`.`" + col.get(u"column_name") + u"`",
-                    u"formated": u".".join(j_tab + [col.get(u"column_name")]),
+                    u"formated": formatted,
                     u"alias": col.get(u"alias") + u"." + col.get(u"column_name"),
                     u"type": self.determine_type(col)
                 })
@@ -132,6 +131,7 @@ class DBParser(object):
                 u"fields": {},
                 u"joins": {}
             }
+            print(json.dumps(joins, indent=4))
             for join in joins:
                 join[u'referenced_alias'], register[u'joins'] = self.manage_joins_duplications(join.get(u"referenced_alias"), register[u'joins'])
 
@@ -148,9 +148,6 @@ class DBParser(object):
             u"joins": joins,
             u"type": u"base"
         }
-
-        if parent_path is None:
-            print(json.dumps(base_state, indent=4))
 
         # Return
         return base_state

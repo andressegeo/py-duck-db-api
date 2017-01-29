@@ -34,11 +34,18 @@ def mock_columns():
 @pytest.fixture(scope=u"function")
 def db_parser(mock_columns):
     db_parser = DBParser(
-        table=u"hour",
+        table=u"user",
         columns=mock_columns
     )
 
     return db_parser
+
+
+def test_generate_base_state(db_parser):
+    ret = db_parser.generate_base_state(
+        u"user"
+    )
+    # print(json.dumps(ret, indent=4))
 
 
 @pytest.fixture(scope=u"function")
@@ -141,7 +148,7 @@ def test_parse_match(db_parser, mock_base_state):
     },
     from_state=base_state)
 
-    print(json.dumps(ret, indent=4))
+
     to_check = [1, 0, 100]
     for val in to_check:
         assert val in ret.get(u"values", [])

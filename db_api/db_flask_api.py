@@ -204,7 +204,6 @@ class DBFlaskAPI(object):
         )
 
 
-
         filters = request.args.get(u'filters')
         order_by = request.args.get(u"order_by")
         export_to = request.args.get(u'export_to')
