@@ -228,7 +228,6 @@ class DBFlaskAPI(object):
                     from_state=base_state
                 )
 
-                return jsonify(filters), 200
                 order_by = db_parser.parse_order_by(
                     order_by=order_by,
                     from_state=base_state

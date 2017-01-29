@@ -89,8 +89,6 @@ def test_parse_match(db_parser, mock_base_state):
         },
         from_state=base_state
     )
-    print("______")
-    print(json.dumps(ret, indent=4))
 
     to_check = [1, 2]
     for val in to_check:
@@ -98,5 +96,57 @@ def test_parse_match(db_parser, mock_base_state):
 
     to_check = [u'`contact.id` = %s', u"AND", u'`contact.id` >= %s']
     for val in to_check:
-        print(val)
         assert val in ret.get(u"statements", [])
+
+    # Scenario 3
+    ret = db_parser.parse_match({
+        u"$or": [
+            {
+                u"contact.id": 3
+            }, {
+                u"company.contact.id": 4
+            }
+        ]
+    },
+        from_state=base_state
+    )
+
+    to_check = [3, 4]
+    for val in to_check:
+        assert val in ret.get(u"values", [])
+
+    to_check = [u'`contact.id` = %s', u"OR", u'`company.contact.id` = %s']
+    for val in to_check:
+        assert val in ret.get(u"statements", [])
+
+    # Scenario 4
+    ret = db_parser.parse_match({
+        u"$or": [
+            {
+                u"company.contact.id": 1
+            }, {
+                u"$and": [
+                    {
+                        u"contact.id": {
+                            u"$gte": 0
+                        }
+                    }, {
+                        u"contact.id": {
+                            u"$lt": 100
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    from_state=base_state)
+
+    print(json.dumps(ret, indent=4))
+    to_check = [1, 0, 100]
+    for val in to_check:
+        assert val in ret.get(u"values", [])
+
+    to_check = [u'`company.contact.id` = %s', u"OR", u'contact.id` >= %s']
+    for val in to_check:
+        assert val in ret.get(u"statements", [])
+
