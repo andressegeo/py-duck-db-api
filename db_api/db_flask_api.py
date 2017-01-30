@@ -203,6 +203,7 @@ class DBFlaskAPI(object):
             columns=self.db_connection.get_columns(table)
         )
 
+        print(self.db_connection.get_columns(table))
         filters = request.args.get(u'filters')
         order_by = request.args.get(u"order_by")
         export_to = request.args.get(u'export_to')

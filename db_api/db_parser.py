@@ -64,6 +64,24 @@ class DBParser(object):
             )
         return joins + updated_joins
 
+    def determine_type(self, col):
+        types_desc = {
+            u"number": [u"int", u"float"],
+            u"text": [u"varchar", u"text"],
+            u"timestamp": [u"date"]
+        }
+
+        def get_machine_type(col):
+            matching_type = None
+            for key in types_desc:
+                for db_type in types_desc[key]:
+                    if db_type in col.get(u'type'):
+                        matching_type = key
+                        break
+            return matching_type
+
+        return get_machine_type(col)
+
     def generate_fields(self, parent_table=None, parent_path=None):
         unreferenced_cols = [
             col for col in self._base_columns
@@ -73,7 +91,8 @@ class DBParser(object):
         return [
             {
                 u"name": col.get(u"column_name"),
-                u"path": parent_path
+                u"path": parent_path,
+                u"type": self.determine_type(col)
             }
             for col in unreferenced_cols
         ]
@@ -197,9 +216,14 @@ class DBParser(object):
             items.append(item)
         return items
 
-    def get_field(self, formatted):
+    def get_field(self, path):
+        looked_field_path = path
+        if self._table != looked_field_path[0]:
+            looked_field_path = [self._table] + looked_field_path
+
         for col in self._last_state.get(u"fields", []):
-            if col.get(u"formated") == formatted:
+            col_field_path = col.get(u"path") + [col.get(u"name")]
+            if col_field_path == looked_field_path:
                 return col
         return None
 
@@ -226,9 +250,9 @@ class DBParser(object):
 
             for key in filter:
                 # If key is an operator
-                field = self.get_field(formatted=key)
+                field = self.get_field(path=key.split(u"."))
                 if field is not None:
-
+                    field_path = u".".join(field.get(u"path") + [field.get(u"name")])
                     value = self.get_wrapped_value(
                         filter[key],
                         field.get(u"type")
@@ -239,16 +263,18 @@ class DBParser(object):
                         where[u"statements"].append(ret[u"statements"])
                         where[u"values"] += ret[u"values"]
                     else:
-                        where[u"statements"].append(u"`{}` = {}".format(field.get(u"formated"), str(value)))
+
+                        where[u"statements"].append(u"`{}` = {}".format(field_path, str(value)))
                         where[u"values"].append(filter[key])
 
                 elif key in self._OPERATORS and parent is not None:
 
-                    field = self.get_field(formatted=parent.get(u"formated"))
-                    value = self.get_wrapped_value(filter[key], field.get(u"type"))
 
+                    field = self.get_field(parent.get(u"path") + [parent.get(u"name")])
+                    value = self.get_wrapped_value(filter[key], field.get(u"type"))
+                    field_path = u".".join(field.get(u"path") + [field.get(u"name")])
                     where[u"statements"].append(u"`{}` {} {}".format(
-                        field.get(u"formated"),
+                        field_path,
                         self._OPERATORS[key],
                         str(value)
                         )
@@ -416,9 +442,10 @@ class DBParser(object):
         return output
 
     def get_wrapped_value(self, value, typ):
+        value = u"%s"
         if typ == u"timestamp":
             value = u"FROM_UNIXTIME(%s)"
-        return u"%s"
+        return value
 
 
     def parse_update(self, data):

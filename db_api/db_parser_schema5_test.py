@@ -63,32 +63,9 @@ def test_generate_base_state(db_parser):
 
     print(json.dumps(ret, indent=4))
 
-@pytest.fixture(scope=u"function")
-def mock_base_state():
-    return {u'fields': [{u'alias': u'user.id', u'db': u'`user`.`id`', u'formated': u'id', u"type": u"number"},
-                        {u'alias': u'contact.id', u'db': u'`contact`.`id`', u'formated': u'contact.id',
-                         u"type": u"number"},
-                        {u'alias': u'contact.number', u'db': u'`contact`.`number`', u'formated': u'contact.number',
-                         u"type": u"text"},
-                        {u'alias': u'company.id', u'db': u'`company`.`id`', u'formated': u'company.id',
-                         u"type": u"number"},
-                        {u'alias': u'contact.id', u'db': u'`contact`.`id`', u'formated': u'company.contact.id',
-                         u"type": u"number"},
-                        {u'alias': u'contact.number', u'db': u'`contact`.`number`, u"type": u"text"',
-                         u'formated': u'company.contact.number'}], u'type': u'base', u'joins': [
-        {u'extra': u'', u'referenced_alias': u'contact', u'referenced_column_name': u'id',
-         u'referenced_table_name': u'phone', u'alias': u'user', u'table_name': u'user', u'key': u'mul', u'null': False,
-         u'type': u'int(11)', u'column_name': u'contact'},
-        {u'extra': u'', u'referenced_alias': u'company', u'referenced_column_name': u'id',
-         u'referenced_table_name': u'company', u'alias': u'user', u'table_name': u'user', u'key': u'mul',
-         u'null': False, u'type': u'int(11)', u'column_name': u'company'},
-        {u'extra': u'', u'referenced_alias': u'contact_0', u'referenced_column_name': u'id',
-         u'referenced_table_name': u'phone', u'alias': u'company', u'table_name': u'company', u'key': u'mul',
-         u'null': False, u'type': u'int(11)', u'column_name': u'contact'}]}
 
-
-def test_parse_match(db_parser, mock_base_state):
-    base_state = mock_base_state
+def test_parse_match(db_parser):
+    base_state = db_parser.generate_base_state()
 
     # Scenario 1
     ret = db_parser.parse_match({
@@ -98,11 +75,12 @@ def test_parse_match(db_parser, mock_base_state):
         from_state=base_state
     )
 
+
     to_check = [1, u"0169888291"]
     for val in to_check:
         assert val in ret.get(u"values", [])
 
-    to_check = [u'`id` = %s', u'`contact.number` = %s']
+    to_check = [u'`user.id` = %s', u'`user.contact.number` = %s']
     for val in to_check:
         assert val in ret.get(u"statements", [])
 
@@ -120,7 +98,7 @@ def test_parse_match(db_parser, mock_base_state):
     for val in to_check:
         assert val in ret.get(u"values", [])
 
-    to_check = [u'`contact.id` = %s', u"AND", u'`contact.id` >= %s']
+    to_check = [u'`user.contact.id` = %s', u"AND", u'`user.contact.id` >= %s']
     for val in to_check:
         assert val in ret.get(u"statements", [])
 
@@ -141,7 +119,7 @@ def test_parse_match(db_parser, mock_base_state):
     for val in to_check:
         assert val in ret.get(u"values", [])
 
-    to_check = [u'`contact.id` = %s', u"OR", u'`company.contact.id` = %s']
+    to_check = [u'`user.contact.id` = %s', u"OR", u'`user.company.contact.id` = %s']
     for val in to_check:
         assert val in ret.get(u"statements", [])
 
@@ -166,11 +144,11 @@ def test_parse_match(db_parser, mock_base_state):
         ]
     },
         from_state=base_state)
-
+    
     to_check = [1, 0, 100]
     for val in to_check:
         assert val in ret.get(u"values", [])
 
-    to_check = [u'`company.contact.id` = %s', u"OR", u'contact.id` >= %s']
+    to_check = [u'`user.company.contact.id` = %s', u"OR", u'user.contact.id` >= %s']
     for val in to_check:
         assert val in ret.get(u"statements", [])
