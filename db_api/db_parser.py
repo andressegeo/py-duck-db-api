@@ -33,6 +33,23 @@ class DBParser(object):
         self._table = table
         self._last_state = None
 
+    def determine_type(self, col):
+        types_desc = {
+            u"number": [u"int", u"float"],
+            u"text": [u"varchar", u"text"],
+            u"timestamp": [u"date"]
+        }
+
+        def get_machine_type(col):
+            matching_type = None
+            for key in types_desc:
+                for db_type in types_desc[key]:
+                    if db_type in col.get(u'type'):
+                        matching_type = key
+                        break
+            return matching_type
+
+        return get_machine_type(col)
 
     def generate_joins(self, table=None, parent_path=None):
         table = table or self._table
@@ -64,39 +81,33 @@ class DBParser(object):
             )
         return joins + updated_joins
 
-    def determine_type(self, col):
-        types_desc = {
-            u"number": [u"int", u"float"],
-            u"text": [u"varchar", u"text"],
-            u"timestamp": [u"date"]
-        }
+    def generate_fields(self, table=None, parent_path=None):
 
-        def get_machine_type(col):
-            matching_type = None
-            for key in types_desc:
-                for db_type in types_desc[key]:
-                    if db_type in col.get(u'type'):
-                        matching_type = key
-                        break
-            return matching_type
+        table = table or self._table
+        fields = []
+        parent_path = parent_path or [table]
+        for col in [col for col in self._base_columns if col.get(u"table_name") == table]:
 
-        return get_machine_type(col)
+            if u"referenced_table_name" not in col:
+                path = parent_path + [col.get(u"column_name")]
+                already_processed = len([
+                    field for field in fields
+                    if u".".join(field.get(u"path") + [field.get(u"name")]) == u".".join(path)]
+                ) > 0
 
-    def generate_fields(self, parent_table=None, parent_path=None):
-        unreferenced_cols = [
-            col for col in self._base_columns
-            if u"referenced_table_name" not in col and col.get(u"table_name") == parent_table
-        ]
+                if not already_processed:
+                    fields.append({
+                        u"name": col.get(u"column_name"),
+                        u"path": parent_path,
+                        u"type": self.determine_type(col)
+                    })
+            else:
+                fields += self.generate_fields(
+                    col.get(u"referenced_table_name"),
+                    parent_path + [col.get(u"column_name")]
+                )
 
-        return [
-            {
-                u"name": col.get(u"column_name"),
-                u"path": parent_path,
-                u"type": self.determine_type(col)
-            }
-            for col in unreferenced_cols
-        ]
-
+        return fields
     def generate_base_state(self, parent_table=None, parent_path=None):
         """
         This method generate a set of variables, that can be seen as dependencies, used by others function
@@ -110,12 +121,8 @@ class DBParser(object):
         j_tab = parent_path or []
         joins = self.generate_joins()
 
-        fields = []
-        for join in joins:
-            fields += self.generate_fields(join.get(u"from_table"), join.get(u"from_path"))
-        if len(joins) == 0:
-            fields += self.generate_fields(self._table, [self._table])
-
+        fields = self.generate_fields(self._table, [self._table])
+        
         base_state = {
             u"fields": sorted(fields, key=lambda x: len(x.get(u"path"))),
             u"joins": sorted(joins, key=lambda x: len(x.get(u"from_path"))),
