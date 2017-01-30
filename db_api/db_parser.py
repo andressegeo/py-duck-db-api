@@ -33,40 +33,6 @@ class DBParser(object):
         self._table = table
         self._last_state = None
 
-    def manage_joins_duplications(self, joins):
-        output = {}
-        for join in joins:
-            if join.get(u"formatted") not in output:
-                output[join.get(u"formatted")] = join
-
-        return [output[key] for key in output]
-
-
-    def manage_fields_duplications(self, base_name, formatted, register):
-        index = 0
-        register = register or {}
-        if formatted in register:
-            register[(formatted, base_name)] = True
-
-        return base_name, register
-
-    def determine_type(self, col):
-        types_desc = {
-            u"number": [u"int", u"float"],
-            u"text": [u"varchar", u"text"],
-            u"timestamp": [u"date"]
-        }
-
-        def get_machine_type(col):
-            matching_type = None
-            for key in types_desc:
-                for db_type in types_desc[key]:
-                    if db_type in col.get(u'type'):
-                        matching_type = key
-                        break
-            return matching_type
-
-        return get_machine_type(col)
 
     def generate_joins(self, table=None, parent_path=None):
         table = table or self._table
@@ -112,7 +78,6 @@ class DBParser(object):
             for col in unreferenced_cols
         ]
 
-
     def generate_base_state(self, parent_table=None, parent_path=None):
         """
         This method generate a set of variables, that can be seen as dependencies, used by others function
@@ -121,7 +86,6 @@ class DBParser(object):
         It always contains fields, joins, to construct a simple get request to a table and his relations.
         :param parent_table:
         :param parent_path:
-        :param set_last_state: Keep in the attribute _last_state.
         :return: dict
         """
         j_tab = parent_path or []
@@ -130,6 +94,8 @@ class DBParser(object):
         fields = []
         for join in joins:
             fields += self.generate_fields(join.get(u"from_table"), join.get(u"from_path"))
+        if len(joins) == 0:
+            fields += self.generate_fields(self._table, [self._table])
 
         base_state = {
             u"fields": sorted(fields, key=lambda x: len(x.get(u"path"))),
@@ -200,9 +166,11 @@ class DBParser(object):
         return ret
 
     def json_put(self, item, path, value):
+
         tab = path.split(u".")
         if tab[0] not in item and len(tab) > 1:
             item[tab[0]] = {}
+
         if len(tab) == 1:
             item[tab[0]] = value
         else:
@@ -219,69 +187,15 @@ class DBParser(object):
         else:
             return val
 
-
-    def rows_to_formated(self, headers, rows, fields, is_formated=True):
+    def rows_to_formated(self, headers, rows, fields):
         items = []
         for row in rows:
             item = {}
-            for index, cell in enumerate(row):
-                key = u"alias"
-                if is_formated:
-                    key = u"path"
-                item = self.json_put(item, fields[index][key], self.python_type_to_json(cell))
-
+            for index, header in enumerate(headers):
+                header_without_base_name = u".".join(header.split(u".")[1:])
+                item = self.json_put(item, header_without_base_name, self.python_type_to_json(row[index]))
             items.append(item)
-
         return items
-
-    def headers_to_json(self, headers):
-        formated_headers = []
-        for header in headers:
-
-            while header.find(u"_") != -1:
-                found = header.find(u"_")
-                header = header[:found] + header[found+1].upper() + header[found+2:]
-
-            formated_headers.append(header)
-
-        return formated_headers
-
-    def formated_to_header(self, json_field, use_referenced=False, use_alias=False, from_state=None):
-        """
-        Format a JSON field given in parameter, when calling the web service attached for example.
-        It will format the field in a database friendly string, and try to find it in
-        :param json_field:
-        :param use_referenced:
-        :param use_alias:
-        :param from_state:
-        :return:
-        """
-        if from_state is None:
-            from_state = self.generate_base_state()
-
-        db_field = None
-
-        for field in from_state.get(u"fields"):
-            if field.get(u"formated") == json_field:
-                if use_alias:
-                    db_field = field.get(u"alias")
-                else:
-                    db_field = field.get(u"db")
-                break
-
-        if use_referenced:
-            for ref in from_state.get(u"joins", []):
-                if db_field == (u"`" + ref[u"referenced_alias"] + u"`.`" + ref[u"referenced_column_name"] + u"`"):
-                    if use_alias:
-                        db_field = (u"`" + ref[u"table_name"] + u"." + ref[u"column_name"] + u"`")
-                    else:
-                        db_field = (u"`" + ref[u"table_name"] + u"`.`" + ref[u"column_name"] + u"`")
-                    break
-        return db_field
-
-    def get_columns_with_reference(self):
-        return [column for column in self._base_columns
-            if u"referenced_table_name" in column]
 
     def get_field(self, formatted):
         for col in self._last_state.get(u"fields", []):
