@@ -144,7 +144,7 @@ def test_parse_match(db_parser):
         ]
     },
         from_state=base_state)
-    
+
     to_check = [1, 0, 100]
     for val in to_check:
         assert val in ret.get(u"values", [])

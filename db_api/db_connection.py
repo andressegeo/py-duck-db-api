@@ -299,6 +299,8 @@ class DBConnection(object):
             query += u" ORDER BY " + order_by[u"statements"]
 
         query += u" LIMIT %s OFFSET %s"
+
+        print(query)
         fetched, description = self._execute(query, (where[u'values'] + [int(nb), int(first)]))
         # If formater in parameter
         if formatter is not None:
