@@ -81,10 +81,10 @@ class DBParser(object):
             )
         return joins + updated_joins
 
-    def generate_fields(self, table=None, parent_path=None):
+    def generate_fields(self, table=None, parent_path=None, fields=None):
 
         table = table or self._table
-        fields = []
+        fields = fields or []
         parent_path = parent_path or [table]
         for col in [col for col in self._base_columns if col.get(u"table_name") == table]:
 
@@ -102,9 +102,10 @@ class DBParser(object):
                         u"type": self.determine_type(col)
                     })
             else:
-                fields += self.generate_fields(
+                fields = self.generate_fields(
                     col.get(u"referenced_table_name"),
-                    parent_path + [col.get(u"column_name")]
+                    parent_path + [col.get(u"column_name")],
+                    fields=fields
                 )
 
         return fields
@@ -122,7 +123,7 @@ class DBParser(object):
         joins = self.generate_joins()
 
         fields = self.generate_fields(self._table, [self._table])
-        
+
         base_state = {
             u"fields": sorted(fields, key=lambda x: len(x.get(u"path"))),
             u"joins": sorted(joins, key=lambda x: len(x.get(u"from_path"))),
