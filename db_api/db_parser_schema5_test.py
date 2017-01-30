@@ -61,7 +61,6 @@ def test_generate_base_state(db_parser):
         u"user"
     )
 
-    print(json.dumps(ret, indent=4))
 
 
 def test_parse_match(db_parser):
@@ -152,3 +151,19 @@ def test_parse_match(db_parser):
     to_check = [u'`user.company.contact.id` = %s', u"OR", u'user.contact.id` >= %s']
     for val in to_check:
         assert val in ret.get(u"statements", [])
+
+
+def test_parse_insert(db_parser):
+    ret = db_parser.parse_insert(data={
+        u"birth": 562369861,
+        u"company": {
+            u"contact": {
+                u"id": 1
+            }
+        },
+        u"contact": {
+            u"id": 2,
+        }
+    })
+
+    print(json.dumps(ret, indent=4))

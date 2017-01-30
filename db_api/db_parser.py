@@ -109,17 +109,15 @@ class DBParser(object):
                 )
 
         return fields
-    def generate_base_state(self, parent_table=None, parent_path=None):
+
+    def generate_base_state(self):
         """
         This method generate a set of variables, that can be seen as dependencies, used by others function
         to construct the base state of the queries allowed to be applied to the selected table.
         The return value is a dict, that can contains anything relevant (a state). In the case of this method,
         It always contains fields, joins, to construct a simple get request to a table and his relations.
-        :param parent_table:
-        :param parent_path:
         :return: dict
         """
-        j_tab = parent_path or []
         joins = self.generate_joins()
 
         fields = self.generate_fields(self._table, [self._table])
@@ -498,6 +496,7 @@ class DBParser(object):
     def parse_insert(self, data):
 
         self._last_state = self.generate_base_state()
+        data = self.to_one_level_json(data)
 
         insert = {
             u"fields": [],
@@ -505,19 +504,22 @@ class DBParser(object):
             u"values": []
         }
 
-        # Remove external dep
         for key in data:
-            if type(data[key]) is dict:
-                data[key] = data[key][u"id"]
-            for col in self._base_columns:
-                if col.get(u"table_name") == self._table and col.get(u"column_name") == key:
-                    db_field = u"{}.{}".format(col.get(u"table_name"), col.get(u"column_name"))
-                    wrapped = self.get_wrapped_values([db_field], [data[key]])
-                    insert[u'fields'].append(
-                        u"`{}`.`{}`".format(col.get(u"table_name"), col.get(u"column_name"))
-                    )
-                    insert[u"positional_values"].append(wrapped)
-                    insert[u"values"].append(data[key])
-                    break
+            field = self.get_field(key.split(u"."))
+            positional_value = self.get_wrapped_value(data[key], field.get(u"type"))
+            if len(field.get(u"path")) == 1:
+                insert[u"fields"].append(u"`{}`.`{}`".format(
+                    field.get(u"path")[0],
+                    field.get(u"name")
+                ))
+            elif len(field.get(u"path")) == 2:
+                insert[u"fields"].append(u"`{}`.`{}`".format(
+                    field.get(u"path")[0],
+                    field.get(u"path")[1]
+                ))
+            if len(field.get(u"path")) <= 2:
+                insert[u'positional_values'].append(positional_value)
+                insert[u"values"].append(data[key])
 
+        print(json.dumps(insert, indent=4))
         return insert

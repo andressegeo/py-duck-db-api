@@ -290,6 +290,7 @@ class DBFlaskAPI(object):
             elif request.method == u"POST":
 
                 insert = db_parser.parse_insert(data=data)
+
                 count = self.db_connection.insert(
                     table=db_parser._table,
                     fields=insert[u"fields"],
