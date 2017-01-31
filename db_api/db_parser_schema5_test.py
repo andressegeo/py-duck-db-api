@@ -180,5 +180,18 @@ def test_parse_update(db_parser):
         }
     })
 
+    values = [
+        1,
+        570629005
+    ]
 
-    print(json.dumps(ret, indent=4))
+    statements = [
+        u"`user`.`contact` = %s",
+        u"`user`.`birth` = FROM_UNIXTIME(%s)"
+    ]
+
+    for value in values:
+        assert value in ret.get(u"values", [])
+
+    for statment in statements:
+        assert statment in ret.get(u"statements", [])

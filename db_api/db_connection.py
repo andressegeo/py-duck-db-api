@@ -213,6 +213,10 @@ class DBConnection(object):
         if where[u"statements"] != u"":
             where[u"statements"] = u" WHERE " + where[u"statements"]
 
+        if update[u"statements"] != u"":
+            update[u"statements"] = u" SET " + u", ".join(update[u'statements'])
+
+
         for join in joins:
             print(join)
 

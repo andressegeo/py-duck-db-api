@@ -503,11 +503,6 @@ class DBParser(object):
                     if len(field.get(u"path")) <= 2:
                         update[u"values"].append(data[key])
 
-        update[u"statements"] = u", ".join(update[u"statements"])
-
-        if update[u"statements"] != u"":
-            update[u"statements"] = u"SET " + update[u"statements"]
-
         return update
 
     def parse_insert(self, data):
