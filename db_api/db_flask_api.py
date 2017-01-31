@@ -270,7 +270,7 @@ class DBFlaskAPI(object):
                 filters = db_parser.parse_match(
                     match=filters,
                     from_state=base_state,
-                    filter_with_alias=False
+                    use_alias=False
                 )
 
                 if filters.get(u"statements") == u"":

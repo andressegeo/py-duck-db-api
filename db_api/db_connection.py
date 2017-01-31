@@ -169,22 +169,8 @@ class DBConnection(object):
 
         return columns
 
-    @staticmethod
-    def _base_query(fields, table, joins):
-        headers = [
-            u".".join(field.get(u"path") + [field.get(u"name")])
-            for field in fields
-            ]
-
-        fields = [
-            u"`{}`.`{}` AS `{}`".format(u".".join(field.get(u"path")), field.get(u"name"),
-                                        u".".join(field.get(u"path") + [field.get(u"name")]))
-            for field in fields
-        ]
-
-
-
-        joins = [
+    def _base_join(self, joins):
+        return [
             (
                 u"""
                 JOIN `{}`
@@ -200,8 +186,23 @@ class DBConnection(object):
                 ref.get(u"to_column")
             )
             for ref in joins
+        ]
+
+    def _base_query(self, fields, table, joins):
+        headers = [
+            u".".join(field.get(u"path") + [field.get(u"name")])
+            for field in fields
             ]
-        query = u"SELECT " + u", ".join(fields) + u" FROM `" + table + u"` " + (u" ".join(joins))
+
+        fields = [
+            u"`{}`.`{}` AS `{}`".format(u".".join(field.get(u"path")), field.get(u"name"),
+                                        u".".join(field.get(u"path") + [field.get(u"name")]))
+            for field in fields
+        ]
+
+        joins = self._base_join(joins)
+
+        query = u"SELECT " + u", ".join(fields) + u" FROM `" + table + u"` " + u" ".join(joins)
 
         return headers, query
 
@@ -216,32 +217,10 @@ class DBConnection(object):
         if update[u"statements"] != u"":
             update[u"statements"] = u" SET " + u", ".join(update[u'statements'])
 
-
-        for join in joins:
-            print(join)
-
-        joins = u" ".join([
-            (
-                u"""
-                JOIN `{}`
-                AS `{}`
-                ON `{}`.`{}` = `{}`.`{}`
-                """
-            ).format(
-                ref.get(u"to_table"),
-                u".".join(ref.get(u"to_path")),
-                u".".join(ref.get(u"from_path")),
-                ref.get(u"from_column"),
-                u".".join(ref.get(u"to_path")),
-                ref.get(u"to_column")
-            )
-            for ref in joins
-        ])
+        joins = u" ".join(self._base_join(joins))
 
         query = u"""UPDATE """ + table + u" " + joins + u""" """ + update[u"statements"] + where[u"statements"]
 
-        print(update)
-        print(query)
         fetched, _ = self._execute(
             u"SELECT COUNT(*) FROM " + table + u" " + joins + u" " + where[u"statements"],
             where[u"values"]
@@ -260,18 +239,7 @@ class DBConnection(object):
         if where[u"statements"] != u"":
             where[u"statements"] = u"WHERE " + where[u"statements"]
 
-        joins = u" ".join([
-            (
-                u"JOIN `" + ref.get(u"referenced_table_name")
-                + u"` AS `" + ref.get(u"referenced_alias")
-                + u"` ON `"
-                + ref.get(u"alias")
-                + u"`.`" + ref.get(u"column_name") + u"` = `"
-                + ref.get(u"referenced_alias")
-                + u"`.`" + ref.get(u"referenced_column_name") + u"`"
-            )
-            for ref in joins
-        ])
+        joins = u" ".join(self._base_join(joins))
 
         end_query = u" " + joins + u" " + where[u"statements"]
 
