@@ -56,13 +56,6 @@ def db_parser(mock_columns):
     return db_parser
 
 
-def test_generate_base_state(db_parser):
-    ret = db_parser.generate_base_state(
-        u"user"
-    )
-
-
-
 def test_parse_match(db_parser):
     base_state = db_parser.generate_base_state()
 
@@ -73,7 +66,6 @@ def test_parse_match(db_parser):
     },
         from_state=base_state
     )
-
 
     to_check = [1, u"0169888291"]
     for val in to_check:
@@ -157,13 +149,36 @@ def test_parse_insert(db_parser):
     ret = db_parser.parse_insert(data={
         u"birth": 562369861,
         u"company": {
-            u"contact": {
-                u"id": 1
-            }
+            u"id": 1,
         },
         u"contact": {
             u"id": 2,
         }
     })
+
+    fields = [u"`user`.`company`", u"`user`.`contact`", u"`user`.`birth`"]
+    positional_values = [u"%s", u"%s", u"FROM_UNIXTIME(%s)"]
+    values = [1, 2, 562369861]
+
+    for field in fields:
+        assert field in ret.get(u"fields", [])
+
+    for p_value in positional_values:
+        assert p_value in ret.get(u"positional_values", [])
+
+    for value in values:
+        assert value in ret.get(u"values", [])
+
+
+def test_parse_update(db_parser):
+    ret = db_parser.parse_update({
+        u"$set": {
+            u"birth": 570629005,
+            u"contact": {
+                u"id": 1
+            }
+        }
+    })
+
 
     print(json.dumps(ret, indent=4))

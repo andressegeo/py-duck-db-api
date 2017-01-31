@@ -238,7 +238,8 @@ class DBParser(object):
             match,
             from_state,
             operator=u"AND",
-            parent=None
+            parent=None,
+            use_alias=True
     ):
         self._last_state = from_state
 
@@ -253,12 +254,10 @@ class DBParser(object):
         }
 
         for filter in match:
-
             for key in filter:
                 # If key is an operator
                 field = self.get_field(path=key.split(u"."))
                 if field is not None:
-                    field_path = u".".join(field.get(u"path") + [field.get(u"name")])
                     value = self.get_wrapped_value(
                         filter[key],
                         field.get(u"type")
@@ -270,21 +269,41 @@ class DBParser(object):
                         where[u"values"] += ret[u"values"]
                     else:
 
-                        where[u"statements"].append(u"`{}` = {}".format(field_path, str(value)))
+                        # If use alias, we filter from the table name dot column name, and not from the
+                        # alias given in the SELECT.
+                        # Necessary for Update query which doesn't allow to put alias.
+                        # Same thing some line above this.
+                        if use_alias:
+                            where[u"statements"].append(u"`{}` = {}".format(
+                                u".".join(field.get(u"path") + [field.get(u"name")]),
+                                str(value))
+                            )
+                        else:
+                            where[u"statements"].append(u"`{}`.`{}` = {}".format(
+                                u".".join(field.get(u"path")),
+                                field.get(u"name"),
+                                str(value))
+                            )
+
                         where[u"values"].append(filter[key])
 
                 elif key in self._OPERATORS and parent is not None:
-
-
                     field = self.get_field(parent.get(u"path") + [parent.get(u"name")])
                     value = self.get_wrapped_value(filter[key], field.get(u"type"))
-                    field_path = u".".join(field.get(u"path") + [field.get(u"name")])
-                    where[u"statements"].append(u"`{}` {} {}".format(
-                        field_path,
-                        self._OPERATORS[key],
-                        str(value)
+
+                    if use_alias:
+                        where[u"statements"].append(u"`{}` {} {}".format(
+                            u".".join(field.get(u"path") + [field.get(u"name")]),
+                            self._OPERATORS[key],
+                            str(value)
+                            )
                         )
-                    )
+                    else:
+                        where[u"statements"].append(u"`{}`.`{}` = {}".format(
+                            u".".join(field.get(u"path")),
+                            self._OPERATORS[key],
+                            str(value)
+                        ))
 
                     where[u"values"].append(filter[key])
 
@@ -463,27 +482,25 @@ class DBParser(object):
 
         if u"$set" in data:
             data = self.to_one_level_json(data[u"$set"])
-
-            # Reformat
-            reformated_data = {}
+            print(json.dumps(data, indent=4))
             for key in data:
-                if type(data[key]) is dict:
-                    reformated_data[key] = data[key][u"id"]
-                elif type(data[key]) is not dict and type(key) in [str, unicode] and key.count(u".") == 1:
-                    tab = key.split(u".")
-                    if len(tab) == 2 and tab[1] == u"id":
-                        reformated_data[tab[0]] = data[key]
-                else:
-                    reformated_data[key] = data[key]
+                field = self.get_field(key.split(u"."))
+                if field is not None:
+                    positional_value = self.get_wrapped_value(data[key], field.get(u"type"))
+                    if len(field.get(u"path")) == 1:
+                        update[u"statements"].append(u"`{}`.`{}` = {}".format(
+                            field.get(u"path")[0],
+                            field.get(u"name"),
+                            positional_value
+                        ))
+                    elif len(field.get(u"path")) == 2:
+                        update[u"statements"].append(u"`{}`.`{}` = {}".format(
+                            field.get(u"path")[0],
+                            field.get(u"path")[1],
+                            positional_value
+                        ))
 
-            data = reformated_data
-            for key in data:
-                for col in self._base_columns:
-                    if col.get(u"table_name") == self._table and col.get(u"column_name") == key:
-                        db_field = u"{}.{}".format(col.get(u"table_name"), col.get(u"column_name"))
-                        wrapped = self.get_wrapped_values([db_field], [data[key]])
-                        db_field = u"`{}`.`{}`".format(col.get(u"table_name"), col.get(u"column_name"))
-                        update[u"statements"] += [(db_field + u" = " + wrapped)]
+                    if len(field.get(u"path")) <= 2:
                         update[u"values"].append(data[key])
 
         update[u"statements"] = u", ".join(update[u"statements"])
@@ -506,20 +523,21 @@ class DBParser(object):
 
         for key in data:
             field = self.get_field(key.split(u"."))
-            positional_value = self.get_wrapped_value(data[key], field.get(u"type"))
-            if len(field.get(u"path")) == 1:
-                insert[u"fields"].append(u"`{}`.`{}`".format(
-                    field.get(u"path")[0],
-                    field.get(u"name")
-                ))
-            elif len(field.get(u"path")) == 2:
-                insert[u"fields"].append(u"`{}`.`{}`".format(
-                    field.get(u"path")[0],
-                    field.get(u"path")[1]
-                ))
-            if len(field.get(u"path")) <= 2:
-                insert[u'positional_values'].append(positional_value)
-                insert[u"values"].append(data[key])
+            if field is not None:
+                positional_value = self.get_wrapped_value(data[key], field.get(u"type"))
+                if len(field.get(u"path")) == 1:
+                    insert[u"fields"].append(u"`{}`.`{}`".format(
+                        field.get(u"path")[0],
+                        field.get(u"name")
+                    ))
+                elif len(field.get(u"path")) == 2:
+                    insert[u"fields"].append(u"`{}`.`{}`".format(
+                        field.get(u"path")[0],
+                        field.get(u"path")[1]
+                    ))
+                if len(field.get(u"path")) <= 2:
+                    insert[u'positional_values'].append(positional_value)
+                    insert[u"values"].append(data[key])
 
         print(json.dumps(insert, indent=4))
         return insert

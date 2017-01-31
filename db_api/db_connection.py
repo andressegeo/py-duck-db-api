@@ -207,31 +207,43 @@ class DBConnection(object):
 
     def update(self, table, joins, update, where):
 
+        table = table or self._table
+
+        count = 0
         if where[u"statements"] != u"":
             where[u"statements"] = u" WHERE " + where[u"statements"]
 
+        for join in joins:
+            print(join)
+
         joins = u" ".join([
             (
-                u"JOIN `" + ref.get(u"referenced_table_name")
-                + u"` AS `" + ref.get(u"referenced_alias")
-                + u"` ON `"
-                + ref.get(u"alias")
-                + u"`.`" + ref.get(u"column_name") + u"` = `"
-                + ref.get(u"referenced_alias")
-                + u"`.`" + ref.get(u"referenced_column_name") + u"`"
+                u"""
+                JOIN `{}`
+                AS `{}`
+                ON `{}`.`{}` = `{}`.`{}`
+                """
+            ).format(
+                ref.get(u"to_table"),
+                u".".join(ref.get(u"to_path")),
+                u".".join(ref.get(u"from_path")),
+                ref.get(u"from_column"),
+                u".".join(ref.get(u"to_path")),
+                ref.get(u"to_column")
             )
             for ref in joins
         ])
 
         query = u"""UPDATE """ + table + u" " + joins + u""" """ + update[u"statements"] + where[u"statements"]
 
+        print(update)
+        print(query)
         fetched, _ = self._execute(
             u"SELECT COUNT(*) FROM " + table + u" " + joins + u" " + where[u"statements"],
             where[u"values"]
         )
-
         count = fetched[0][0]
-        self._execute(query, update[u"values"] + where[u"values"])
+        # self._execute(query, update[u"values"] + where[u"values"])
         return count
 
     def delete(self, table, joins, where):

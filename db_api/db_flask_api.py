@@ -219,7 +219,6 @@ class DBFlaskAPI(object):
 
         base_state = db_parser.generate_base_state()
 
-
         try:
             if request.method == u"GET":
                 filters = db_parser.parse_match(
@@ -252,7 +251,7 @@ class DBFlaskAPI(object):
                 filters = db_parser.parse_match(
                     match=filters,
                     from_state=base_state,
-                    filter_with_alias=False
+                    use_alias=False
                 )
                 count = self.db_connection.update(
                     table=table,
