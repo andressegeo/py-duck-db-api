@@ -532,7 +532,8 @@ def test_parse_order_by(db_parser):
 
 
 def test_parse_group(db_parser):
-    ret = db_parser.parse_group(group={
+    ret = db_parser.parse_group(
+        group={
             u"_id": {
                 u"affected_to": u"$affected_to.id",
                 u"project": u"$project.id"

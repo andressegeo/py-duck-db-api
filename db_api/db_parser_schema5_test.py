@@ -238,3 +238,19 @@ def test_parse_project(db_parser):
 
     for field in fields_to_check:
         assert field in ret[u"state"].get(u"fields", [])
+
+
+def test_parse_group(db_parser):
+    ret = db_parser.parse_group(
+        group={
+            u"_id": {
+                u"id": u"$id"
+            },
+            u"ids_sum": {
+                u"$sum": u"$contact.id"
+            }
+        },
+        from_state=db_parser.generate_base_state()
+    )
+
+    print(json.dumps(ret, indent=4))

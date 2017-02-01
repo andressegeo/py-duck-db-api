@@ -373,7 +373,6 @@ class DBParser(object):
         order_by = self.to_one_level_json(order_by) or {}
         self._last_state = from_state
 
-        print(json.dumps(from_state, indent=4))
         ret = {
             u"statements": []
         }
@@ -409,14 +408,14 @@ class DBParser(object):
                 group_by = group[key]
                 for grp_key in group_by:
                     if type(group_by[grp_key]) is unicode and u"$" == group_by[grp_key][0]:
-                        field = self.find_col_field(group_by[grp_key][1:])
-                        ret[u"group_by"].append(u"`{}`".format(field))
-                        id_field = u"_id.{}".format(field)
-                        ret[u"fields"].append(u"`{}` AS `{}`".format(field, id_field))
-                        ret[u"state"][u"fields"].append({
-                            u"alias": id_field,
-                            u"formated": id_field
-                        })
+                        field = self.get_field(grp_key.split(u"."))
+                        ret[u"group_by"].append(u"`{}`".format(u".".join(field.get(u"path") + [field.get(u"name")])))
+                        # id_field = u"_id.{}".format(field)
+                        # ret[u"fields"].append(u"`{}` AS `{}`".format(field, id_field))
+                        # ret[u"state"][u"fields"].append({
+                        #     u"alias": id_field,
+                        #     u"formated": id_field
+                        # })
             elif type(group[key]) == dict:
 
                 accumulators = group[key]
