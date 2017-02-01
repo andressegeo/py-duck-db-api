@@ -217,18 +217,21 @@ class DBParser(object):
         for row in rows:
             item = {}
             for index, header in enumerate(headers):
-                header_without_base_name = u".".join(header.split(u".")[1:])
-                item = self.json_put(item, header_without_base_name, self.python_type_to_json(row[index]))
+                header = header.split(u".")[1:] if self._last_state.get(u"type") == u"base" else header.split(u".")
+                item = self.json_put(item, u".".join(header), self.python_type_to_json(row[index]))
             items.append(item)
         return items
 
     def get_field(self, path):
+
+        implicit_table = self._last_state.get(u"type", None) == u"base"
         looked_field_path = path
-        if self._table != looked_field_path[0]:
+        if implicit_table and self._table != looked_field_path[0]:
             looked_field_path = [self._table] + looked_field_path
 
         for col in self._last_state.get(u"fields", []):
             col_field_path = col.get(u"path") + [col.get(u"name")]
+            print(u"{} = {}".format(col_field_path, looked_field_path))
             if col_field_path == looked_field_path:
                 return col
         return None
@@ -334,25 +337,23 @@ class DBParser(object):
                 u"fields": []
             }  # Dependencies for potential next stage
         }
-
+        project = self.to_one_level_json(project) or {}
         for key in project:
             if project[key] == 1:
-                field = self.find_col_field(key)
-                ret[u'statements'].append(u"`" + field + u"` AS %s")
-                ret[u'values'].append(key)
-                ret[u'state'][u"fields"].append({
-                    u"alias": key,
-                    u"formated": key
-                })
+                field = self.get_field(key.split(u"."))
             elif type(project[key]) is unicode and u"$" in project[key]:
+                field = self.get_field(project[key][1:].split(u"."))
+            else:
+                continue
 
-                field = self.find_col_field(project[key][1:])
-                ret[u'statements'].append(u"`{}` AS %s".format(field))
-                ret[u'values'].append(key)
-                ret[u'state'][u"fields"].append({
-                    u"alias": key,
-                    u"formated": key
-                })
+            ret[u'statements'].append(u"`{}` AS %s".format(u".".join(field.get(u"path") + [field.get(u"name")])))
+            ret[u'values'].append(key)
+            new_key = key.split(u".")
+            ret[u'state'][u"fields"].append({
+                u"path": new_key[:-1],
+                u"type": field.get(u"type"),
+                u"name": new_key[-1]
+            })
 
         ret[u'statements'] = u", ".join(ret[u'statements'])
         return ret
@@ -369,19 +370,20 @@ class DBParser(object):
 
     def parse_order_by(self, order_by, from_state):
 
-        order_by = order_by or {}
+        order_by = self.to_one_level_json(order_by) or {}
         self._last_state = from_state
+
+        print(json.dumps(from_state, indent=4))
         ret = {
             u"statements": []
         }
 
         for key in order_by:
-            field = self.find_col_field(key)
-            formatted = u"`{}` {}"
-            if order_by[key] == 1:
-                ret[u"statements"].append(formatted.format(field, u"ASC"))
-            elif order_by[key] == -1:
-                ret[u"statements"].append(formatted.format(field, u"DESC"))
+            field = self.get_field(key.split(u"."))
+            print(field)
+            if order_by[key] in [1, -1]:
+                order = u"ASC" if order_by[key] == 1 else u"DESC"
+                ret[u"statements"].append(u"`{}` {}".format(u".".join(field.get(u"path") + [field.get(u"name")]), order))
 
         ret[u'statements'] = u", ".join(ret[u'statements'])
         return ret
@@ -455,6 +457,7 @@ class DBParser(object):
 
     def to_one_level_json(self, obj, parent=None):
         output = {}
+        obj = obj or {}
         parent = parent or []
 
         for key in obj:
@@ -471,7 +474,6 @@ class DBParser(object):
         if typ == u"timestamp":
             value = u"FROM_UNIXTIME(%s)"
         return value
-
 
     def parse_update(self, data):
         self._last_state = self.generate_base_state()
@@ -533,6 +535,5 @@ class DBParser(object):
                 if len(field.get(u"path")) <= 2:
                     insert[u'positional_values'].append(positional_value)
                     insert[u"values"].append(data[key])
-
-        print(json.dumps(insert, indent=4))
         return insert
+

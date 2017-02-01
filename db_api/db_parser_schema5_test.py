@@ -195,3 +195,46 @@ def test_parse_update(db_parser):
 
     for statment in statements:
         assert statment in ret.get(u"statements", [])
+
+
+def test_parse_order_by(db_parser):
+    ret = db_parser.parse_order_by(order_by={
+        u"id": 1,
+        u"contact.id": -1
+    },
+        from_state=db_parser.generate_base_state()
+    )
+
+    print(json.dumps(ret, indent=4))
+
+    statements = [u"`user.id` ASC", u"`user.contact.id` DESC"]
+    for stat in statements:
+        assert stat in ret.get(u"statements")
+
+
+def test_parse_project(db_parser):
+
+    ret = db_parser.parse_project(project={
+            u"id": 1,
+            u"the_awesome_contact.name": u"$contact.id"
+        },
+        from_state=db_parser.generate_base_state()
+    )
+
+    fields_to_check = [
+        {
+            u"path": [
+                u"the_awesome_contact"
+            ],
+            u"type": u"number",
+            u"name": u"name"
+        },
+        {
+            u"path": [],
+            u"type": u"number",
+            u"name": u"id"
+        }
+    ]
+
+    for field in fields_to_check:
+        assert field in ret[u"state"].get(u"fields", [])

@@ -357,6 +357,11 @@ class DBConnection(object):
         last_state = last_state or base_state
         fetched, description = self._execute(query, values)
 
+        headers = [
+            u".".join(field.get(u"path") + [field.get(u"name")])
+            for field in last_state.get(u"fields", [])
+        ]
+
         # If formater in parameter
         if formater is not None:
             return formater(
