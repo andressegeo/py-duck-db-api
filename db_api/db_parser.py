@@ -4,7 +4,7 @@ import datetime
 import calendar
 import re
 import json
-
+import decimal
 
 class DBParser(object):
 
@@ -203,7 +203,10 @@ class DBParser(object):
         return item
 
     def python_type_to_json(self, val):
-        if type(val) in [long, float]:
+
+        if isinstance(val, decimal.Decimal):
+            return float(val)
+        elif type(val) in [long, float]:
             return float(val)
         elif type(val) is str:
             return val.decode('utf-8')
@@ -218,7 +221,9 @@ class DBParser(object):
             item = {}
             for index, header in enumerate(headers):
                 header = header.split(u".")[1:] if self._last_state.get(u"type") == u"base" else header.split(u".")
-                item = self.json_put(item, u".".join(header), self.python_type_to_json(row[index]))
+                print(self._last_state.get(u"type"))
+                value = self.python_type_to_json(row[index])
+                item = self.json_put(item, u".".join(header), value)
             items.append(item)
         return items
 
@@ -231,7 +236,6 @@ class DBParser(object):
 
         for col in self._last_state.get(u"fields", []):
             col_field_path = col.get(u"path") + [col.get(u"name")]
-            print(u"{} = {}".format(col_field_path, looked_field_path))
             if col_field_path == looked_field_path:
                 return col
         return None
@@ -379,7 +383,6 @@ class DBParser(object):
 
         for key in order_by:
             field = self.get_field(key.split(u"."))
-            print(field)
             if order_by[key] in [1, -1]:
                 order = u"ASC" if order_by[key] == 1 else u"DESC"
                 ret[u"statements"].append(u"`{}` {}".format(u".".join(field.get(u"path") + [field.get(u"name")]), order))
@@ -410,14 +413,19 @@ class DBParser(object):
                     if type(group_by[grp_key]) is unicode and u"$" == group_by[grp_key][0]:
                         field = self.get_field(grp_key.split(u"."))
                         ret[u"group_by"].append(u"`{}`".format(u".".join(field.get(u"path") + [field.get(u"name")])))
-                        # id_field = u"_id.{}".format(field)
-                        # ret[u"fields"].append(u"`{}` AS `{}`".format(field, id_field))
-                        # ret[u"state"][u"fields"].append({
-                        #     u"alias": id_field,
-                        #     u"formated": id_field
-                        # })
-            elif type(group[key]) == dict:
 
+                        ret[u"fields"].append(u"`{}` AS `{}`".format(
+                            u".".join(field.get(u"path") + [field.get(u"name")]),
+                            u".".join([u"_id"] + [grp_key])
+                        ))
+
+                        new_key = [u"_id"] + grp_key.split(u".")
+                        ret[u'state'][u"fields"].append({
+                            u"path": new_key[:-1],
+                            u"type": field.get(u"type"),
+                            u"name": new_key[-1]
+                        })
+            elif type(group[key]) == dict:
                 accumulators = group[key]
                 for acc_key in accumulators:
                     acc_op = self._GROUP_OPERATORS.get(acc_key, None)
@@ -428,22 +436,25 @@ class DBParser(object):
                             u"*",
                             u"%s"
                         ))
-                        ret[u"values"].append(key)
-                        ret[u"state"][u"fields"].append({
-                            u"alias": key,
-                            u"formated": key
+                        new_key = key.split(u".")
+                        ret[u'state'][u"fields"].append({
+                            u"path": new_key[:-1],
+                            u"type": field.get(u"type"),
+                            u"name": new_key[-1]
                         })
                     elif type(acc_val) is unicode and acc_val[0] == u"$":
-                        field = self.find_col_field(acc_val[1:])
+                        field = self.get_field(acc_val[1:].split(u"."))
                         ret[u"fields"].append(u"{}(`{}`) AS {}".format(
                             acc_op,
-                            field,
+                            u".".join(field.get(u"path") + [field.get(u"name")]),
                             u"%s"
                         ))
                         ret[u"values"].append(key)
-                        ret[u"state"][u"fields"].append({
-                            u"alias": key,
-                            u"formated": key
+                        new_key = key.split(u".")
+                        ret[u'state'][u"fields"].append({
+                            u"path": new_key[:-1],
+                            u"type": field.get(u"type"),
+                            u"name": new_key[-1]
                         })
 
         return ret
@@ -483,7 +494,6 @@ class DBParser(object):
 
         if u"$set" in data:
             data = self.to_one_level_json(data[u"$set"])
-            print(json.dumps(data, indent=4))
             for key in data:
                 field = self.get_field(key.split(u"."))
                 if field is not None:

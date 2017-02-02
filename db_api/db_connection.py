@@ -354,6 +354,7 @@ class DBConnection(object):
                 if parsed.get(u"statements", u"") != u"":
                     query += u" ORDER BY {}".format(parsed.get(u"statements"))
 
+
         last_state = last_state or base_state
         fetched, description = self._execute(query, values)
 

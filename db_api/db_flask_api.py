@@ -191,7 +191,6 @@ class DBFlaskAPI(object):
         )
 
         result[u'items'] = items
-
         return jsonify(result), code
 
     def handle_request(self, request, table):
