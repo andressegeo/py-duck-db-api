@@ -51,7 +51,7 @@ class DBConnection(object):
         """
 
         cursor = self._db.cursor()
-
+        print(query)
         try:
             cursor.execute(query, values)
         except self._db_api_def.OperationalError as e:
@@ -284,7 +284,6 @@ class DBConnection(object):
 
         query += u" LIMIT %s OFFSET %s"
 
-        print(query)
         fetched, description = self._execute(query, (where[u'values'] + [int(nb), int(first)]))
         # If formater in parameter
         if formatter is not None:
@@ -362,7 +361,6 @@ class DBConnection(object):
             u".".join(field.get(u"path") + [field.get(u"name")])
             for field in last_state.get(u"fields", [])
         ]
-
         # If formater in parameter
         if formater is not None:
             return formater(

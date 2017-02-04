@@ -220,10 +220,8 @@ class DBParser(object):
         for row in rows:
             item = {}
             for index, header in enumerate(headers):
-                header = header.split(u".")[1:] if self._last_state.get(u"type") == u"base" else header.split(u".")
-                print(self._last_state.get(u"type"))
                 value = self.python_type_to_json(row[index])
-                item = self.json_put(item, u".".join(header), value)
+                item = self.json_put(item, u".".join(fields[index].get(u"path") + [fields[index].get(u"name")]), value)
             items.append(item)
         return items
 
