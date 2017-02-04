@@ -269,7 +269,7 @@ class DBParser(object):
                     )
 
                     if type(filter[key]) is dict:
-                        ret = self.parse_match(filter[key], parent=field, from_state=from_state)
+                        ret = self.parse_match(filter[key], parent=field, from_state=from_state, use_alias=use_alias)
                         where[u"statements"].append(ret[u"statements"])
                         where[u"values"] += ret[u"values"]
                     else:
@@ -304,8 +304,9 @@ class DBParser(object):
                             )
                         )
                     else:
-                        where[u"statements"].append(u"`{}`.`{}` = {}".format(
+                        where[u"statements"].append(u"`{}`.`{}` {} {}".format(
                             u".".join(field.get(u"path")),
+                            field.get(u"name"),
                             self._OPERATORS[key],
                             str(value)
                         ))
@@ -317,14 +318,14 @@ class DBParser(object):
                         filter[key],
                         from_state=from_state,
                         operator=self._RECURSIVE_OPERATORS[key],
-                        parent=None
+                        parent=None,
+                        use_alias=use_alias
                     )
 
                     where[u"statements"].append(u"(" + ret[u"statements"] + u")")
                     where[u"values"] += ret[u"values"]
 
         where[u"statements"] = (u" " + operator + u" ").join(where[u"statements"])
-
         return where
 
     def is_field(self, key):

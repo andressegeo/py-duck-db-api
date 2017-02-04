@@ -243,16 +243,20 @@ class DBConnection(object):
 
         end_query = u" " + joins + u" " + where[u"statements"]
 
+        count_query = u"SELECT COUNT(*) FROM " + table + end_query
+
         # Determine how many lines are going to be deleted
         fetched, _ = self._execute(
-            query=u"SELECT COUNT(*) FROM " + table + end_query,
+            query=count_query,
             values=where[u"values"]
         )
         count = fetched[0][0]
 
+        query = u"""DELETE """ + table + u" FROM " + table + end_query
+
         # Execute the final query
         self._execute(
-            query=u"""DELETE """ + table + u" FROM " + table + end_query,
+            query=query,
             values=where[u'values']
         )
 
