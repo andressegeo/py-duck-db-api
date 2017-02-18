@@ -215,13 +215,17 @@ class DBParser(object):
         else:
             return val
 
-    def rows_to_formated(self, headers, rows, fields):
+    def rows_to_formated(self, headers, rows, fields, ignore_prefix=False):
         items = []
         for row in rows:
             item = {}
             for index, header in enumerate(headers):
                 value = self.python_type_to_json(row[index])
-                item = self.json_put(item, u".".join(fields[index].get(u"path") + [fields[index].get(u"name")]), value)
+                if ignore_prefix:
+                    rel_path = fields[index].get(u"path")[1:]
+                else:
+                    rel_path = fields[index].get(u"path")
+                item = self.json_put(item, u".".join(rel_path + [fields[index].get(u"name")]), value)
             items.append(item)
         return items
 
@@ -328,9 +332,6 @@ class DBParser(object):
         where[u"statements"] = (u" " + operator + u" ").join(where[u"statements"])
         return where
 
-    def is_field(self, key):
-        return self.get_alias_from_j_path(key) is not None
-
     def parse_project(self, project, from_state=None):
         self._last_state = from_state
         ret = {
@@ -410,7 +411,7 @@ class DBParser(object):
                 group_by = group[key]
                 for grp_key in group_by:
                     if type(group_by[grp_key]) is unicode and u"$" == group_by[grp_key][0]:
-                        field = self.get_field(grp_key.split(u"."))
+                        field = self.get_field(group_by[grp_key][1:].split(u"."))
                         ret[u"group_by"].append(u"`{}`".format(u".".join(field.get(u"path") + [field.get(u"name")])))
 
                         ret[u"fields"].append(u"`{}` AS `{}`".format(

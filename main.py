@@ -22,7 +22,7 @@ app.register_blueprint(construct_db_api_blueprint(
     db_host=u"127.0.0.1",
     db_user=u"root",
     db_passwd=u"localroot1234",
-    db_name=u"issue5"
+    db_name=u"hours_count"
 ), url_prefix=u'/api')
 
 if __name__ == u"__main__":

@@ -51,7 +51,6 @@ class DBConnection(object):
         """
 
         cursor = self._db.cursor()
-        print(query)
         try:
             cursor.execute(query, values)
         except self._db_api_def.OperationalError as e:
@@ -294,7 +293,8 @@ class DBConnection(object):
             return formatter(
                 headers,
                 fetched,
-                fields
+                fields,
+                ignore_prefix=True
             )
 
         return [i[0] for i in description], fetched
@@ -357,7 +357,6 @@ class DBConnection(object):
                 if parsed.get(u"statements", u"") != u"":
                     query += u" ORDER BY {}".format(parsed.get(u"statements"))
 
-
         last_state = last_state or base_state
         fetched, description = self._execute(query, values)
 
@@ -370,7 +369,8 @@ class DBConnection(object):
             return formater(
                 headers,
                 fetched,
-                last_state.get(u"fields")
+                last_state.get(u"fields"),
+                ignore_prefix=last_state is not None
             )
 
         return [i[0] for i in description], fetched
