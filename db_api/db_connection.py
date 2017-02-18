@@ -184,7 +184,7 @@ class DBConnection(object):
             where[u"values"]
         )
         count = fetched[0][0]
-        # self._execute(query, update[u"values"] + where[u"values"])
+        self._execute(query, update[u"values"] + where[u"values"])
         return count
 
     def delete(self, table, joins, where):
