@@ -337,6 +337,7 @@ class DBConnection(object):
         cursor = self._db.cursor()
 
         query = u"INSERT INTO {}({}) VALUES ({})".format(table, u", ".join(fields), u", ".join(positional_values))
+        print(query)
         try:
             cursor.execute(query, values)
         except self._db_api_def.OperationalError as e:
