@@ -3,7 +3,7 @@
 import json
 import logging
 import csv
-
+import uuid
 class DBConnection(object):
 
     def __init__(
@@ -81,7 +81,7 @@ class DBConnection(object):
                 u"column_name": constraint[1],
                 u"referenced_table_name": constraint[2],
                 u"referenced_column_name": constraint[3],
-                u"referenced_alias": constraint[1]
+                u"referenced_alias": constraint[0] + u"_" + constraint[1]
             }
             for constraint in fetched
             ]
@@ -125,48 +125,6 @@ class DBConnection(object):
             columns.append(column)
         return columns
 
-    def get_columns(self, table, alias=None):
-
-        referenced = self.get_referenced(table)
-
-        query = u"""
-        DESCRIBE
-        """ + table + """"""
-
-        fetched, _ = self._execute(query)
-
-        columns = []
-        # For each row
-        for row in fetched:
-            column = {
-                u"table_name": table,
-                u"column_name": row[0],
-                u"type": row[1],
-                u"null": row[2] == u"YES",
-                u"key": row[3].lower(),
-                u"extra": row[5].lower()
-            }
-            if alias is not None:
-                column[u"alias"] = alias
-            else:
-                column[u"alias"] = table
-
-            # If reference found, add it
-            for ref in referenced:
-                if (
-                    ref.get(u"table_name") == column.get(u"table_name")
-                    and ref.get(u"column_name") == column.get(u"column_name")
-                ):
-                    column.update(ref)
-                    columns += self.get_columns(
-                        ref.get(u"referenced_table_name"),
-                        alias=ref.get(u"column_name")
-                    )
-                    break
-            columns.append(column)
-
-
-        return columns
 
     def _base_join(self, joins):
         return [
@@ -286,7 +244,9 @@ class DBConnection(object):
             query += u" ORDER BY " + order_by[u"statements"]
 
         query += u" LIMIT %s OFFSET %s"
-
+        print("_________________\n")
+        print(query)
+        print("\n________________")
         fetched, description = self._execute(query, (where[u'values'] + [int(nb), int(first)]))
         # If formater in parameter
         if formatter is not None:
