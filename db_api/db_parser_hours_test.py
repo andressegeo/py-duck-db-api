@@ -252,20 +252,14 @@ def test_parse_insert(db_parser):
         u"`hour`.`started_at`",
         u"`hour`.`project`",
         u"`hour`.`affected_to`",
-        u"`hour`.`project`",
         u"`hour`.`minutes`",
-        u"`hour`.`affected_to`",
         u"`hour`.`issue`",
-        u"`hour`.`comments`",
-        u"`hour`.`affected_to`"
+        u"`hour`.`comments`"
     ], ret[u"fields"])
 
     values_in_tab(
         [
             u"FROM_UNIXTIME(%s)",
-            u"%s",
-            u"%s",
-            u"%s",
             u"%s",
             u"%s",
             u"%s",
@@ -281,10 +275,8 @@ def test_parse_insert(db_parser):
         1,
         1,
         5,
-        u"Kévin LAMBERT",
         u"test",
         u"test",
-        u"klambert@gpartner.eu"
     ],
         ret[u"values"]
     )

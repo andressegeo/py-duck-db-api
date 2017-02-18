@@ -520,7 +520,6 @@ class DBParser(object):
 
         self._last_state = self.generate_base_state()
         data = self.to_one_level_json(data)
-
         insert = {
             u"fields": [],
             u"positional_values": [],
@@ -531,17 +530,20 @@ class DBParser(object):
             field = self.get_field(key.split(u"."))
             if field is not None:
                 positional_value = self.get_wrapped_value(data[key], field.get(u"type"))
+                field_path = None
                 if len(field.get(u"path")) == 1:
-                    insert[u"fields"].append(u"`{}`.`{}`".format(
+                    field_path = u"`{}`.`{}`".format(
                         field.get(u"path")[0],
                         field.get(u"name")
-                    ))
-                elif len(field.get(u"path")) == 2:
-                    insert[u"fields"].append(u"`{}`.`{}`".format(
+                    )
+                elif len(field.get(u"path")) <= 2:
+                    field_path = u"`{}`.`{}`".format(
                         field.get(u"path")[0],
                         field.get(u"path")[1]
-                    ))
-                if len(field.get(u"path")) <= 2:
+                    )
+
+                if field_path is not None and field_path not in insert[u"fields"]:
+                    insert[u"fields"].append(field_path)
                     insert[u'positional_values'].append(positional_value)
                     insert[u"values"].append(data[key])
         return insert
