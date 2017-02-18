@@ -498,20 +498,22 @@ class DBParser(object):
                 field = self.get_field(key.split(u"."))
                 if field is not None:
                     positional_value = self.get_wrapped_value(data[key], field.get(u"type"))
+                    field_path = None
                     if len(field.get(u"path")) == 1:
-                        update[u"statements"].append(u"`{}`.`{}` = {}".format(
+                        field_path = u"`{}`.`{}` = {}".format(
                             field.get(u"path")[0],
                             field.get(u"name"),
                             positional_value
-                        ))
+                        )
                     elif len(field.get(u"path")) == 2:
-                        update[u"statements"].append(u"`{}`.`{}` = {}".format(
+                        field_path = u"`{}`.`{}` = {}".format(
                             field.get(u"path")[0],
                             field.get(u"path")[1],
                             positional_value
-                        ))
+                        )
 
-                    if len(field.get(u"path")) <= 2:
+                    if field_path is not None and field_path not in update[u"statements"]:
+                        update[u"statements"].append(field_path)
                         update[u"values"].append(data[key])
 
         return update
