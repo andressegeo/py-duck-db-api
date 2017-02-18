@@ -19,10 +19,10 @@ from db_api.db_connection import DBConnection
 
 app.register_blueprint(construct_db_api_blueprint(
     db_driver=MySQLdb,
-    db_host=u"173.194.111.105",
-    db_user=u"da",
-    db_passwd=u"123456",
-    db_name=u"da"
+    db_host=u"127.0.0.1",
+    db_user=u"root",
+    db_passwd=u"localroot1234",
+    db_name=u"hours_count"
 ), url_prefix=u'/api')
 
 if __name__ == u"__main__":

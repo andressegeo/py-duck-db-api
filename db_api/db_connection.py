@@ -52,6 +52,7 @@ class DBConnection(object):
 
         cursor = self._db.cursor()
         try:
+            print(query)
             cursor.execute(query, values)
         except self._db_api_def.OperationalError as e:
             self._do_reconnect_if_needed(e)
