@@ -236,8 +236,10 @@ class DBParser(object):
         if implicit_table and self._table != looked_field_path[0]:
             looked_field_path = [self._table] + looked_field_path
 
+        print(json.dumps(self._last_state, indent=4))
         for col in self._last_state.get(u"fields", []):
-            col_field_path = col.get(u"path") + [col.get(u"name")]
+            col_field_path = col.get(u"path") + col.get(u"name").split(u".")
+            print(str(col_field_path) + u"==" + str(looked_field_path))
             if col_field_path == looked_field_path:
                 return col
         return None
