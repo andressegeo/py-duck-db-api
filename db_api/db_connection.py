@@ -19,51 +19,52 @@ class DBConnection(object):
         self._user = user
         self._password = password
         self._database = database
-        self._connect()
+        self._referenced_cache = {}
+        self.connect()
 
-    def _connect(self):
-        self._db = self._db_api_def.connect(
+    def connect(self):
+        db = self._db_api_def.connect(
             host=self._host,
             user=self._user,
             passwd=self._password,
             db=self._database,
             charset=u"utf8"
         )
+        return db
 
-    def _do_reconnect_if_needed(self, e):
-        if e[0] == 2006:
-            logging.info(u"Connection lost. Reconnecting ... {}".format(e))
-            self._connect()
-            logging.info(u"Connection recovered")
-        else:
-            logging.warning(u"Incident : {}".format(e))
-            raise e
-
-    def _execute(self, query, values=None, do_commit=True):
+    def _execute(self, query, values=None, custom_cursor=None):
         """
         :type query: string
         :param query: The SQL query to execute
         :type values: List
         :param values: The values to sanitize & pass to the query to replace the "%s" values.
-        :type do_commit: Bool
-        :param do_commit: If the value has to be saved immediately, or can allow a rollback.
         :return:
         """
 
-        cursor = self._db.cursor()
-        try:
-            print(query)
-            cursor.execute(query, values)
-        except self._db_api_def.OperationalError as e:
-            self._do_reconnect_if_needed(e)
-            cursor.execute(query, values)
+        cursor = custom_cursor
 
-        if do_commit:
+        if custom_cursor is None:
+            # Create connection
+            db = self.connect()
+            cursor = db.cursor()
+            # Execute query
+            cursor.execute(query, values)
+            ret = cursor.fetchall(), cursor.description
+            # Commit & close
             cursor.connection.commit()
-        return cursor.fetchall(), cursor.description
+            cursor.close()
+            db.close()
+        else:
+            # Just execute, opening & close handled somewhere else
+            cursor.execute(query, values)
+            ret = cursor.fetchall(), cursor.description
+
+        return ret
 
     def get_referenced(self, table):
-        cursor = self._db.cursor()
+        if table in self._referenced_cache:
+            return self._referenced_cache[table]
+
         query = u"""
                 SELECT
                 TABLE_NAME,
@@ -76,6 +77,7 @@ class DBConnection(object):
                 AND REFERENCED_TABLE_NAME IS NOT NULL
                 """
         fetched, _ = self._execute(query, values=(self._database, table))
+
         referenced = [
             {
                 u"table_name": constraint[0],
@@ -88,13 +90,16 @@ class DBConnection(object):
             ]
         for ref in referenced:
             referenced += self.get_referenced(ref[u"referenced_table_name"])
+
+        self._referenced_cache[table] = referenced
+
         return referenced
 
     def get_columns(self, table, alias=None):
         referenced = self.get_referenced(table)
         query = u"""
                 DESCRIBE
-                """ + table + """"""
+                """ + table + u""""""
         fetched, _ = self._execute(query)
         columns = []
         # For each row
@@ -278,7 +283,7 @@ class DBConnection(object):
             if stage_type == u"match":
 
                 query = u"SELECT * FROM ( {} ) AS s_{}".format(
-                    query, 
+                    query,
                     index+1,
                 )
 
@@ -322,7 +327,7 @@ class DBConnection(object):
             u".".join(field.get(u"path") + [field.get(u"name")])
             for field in last_state.get(u"fields", [])
         ]
-        # If formater in parameter
+        # If formatter in parameter
         if formater is not None:
             return formater(
                 headers,
@@ -334,18 +339,19 @@ class DBConnection(object):
         return [i[0] for i in description], fetched
 
     def insert(self, table, fields, positional_values, values):
-        cursor = self._db.cursor()
+        db = self.connect()
+        cursor = db.cursor()
 
         query = u"INSERT INTO {}({}) VALUES ({})".format(table, u", ".join(fields), u", ".join(positional_values))
-        print(query)
-        try:
-            cursor.execute(query, values)
-        except self._db_api_def.OperationalError as e:
-            self._do_reconnect_if_needed(e)
-            cursor.execute(query, values)
+        cursor.execute(query, values)
 
         cursor.connection.commit()
-        return cursor.lastrowid
+        last_row_id = cursor.lastrowid
+
+        cursor.close()
+        db.close()
+
+        return last_row_id
 
     def export(self, headers, rows):
         pass
