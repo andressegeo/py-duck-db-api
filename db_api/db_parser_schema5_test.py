@@ -205,7 +205,6 @@ def test_parse_order_by(db_parser):
         from_state=db_parser.generate_base_state()
     )
 
-    print(json.dumps(ret, indent=4))
 
     statements = [u"`user.id` ASC", u"`user.contact.id` DESC"]
     for stat in statements:

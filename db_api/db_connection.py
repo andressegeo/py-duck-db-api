@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import json
-import logging
-import csv
-import uuid
+
 class DBConnection(object):
 
     def __init__(
@@ -264,7 +261,7 @@ class DBConnection(object):
 
     def aggregate(self, table, base_state, stages=None, formater=None):
         stages = stages or []
-
+        ignore_prefix = True
         headers, query = self._base_query(
             fields=base_state.get(u"fields"),
             table=table,
@@ -299,6 +296,7 @@ class DBConnection(object):
                     query,
                     index+1,
                 )
+                ignore_prefix = False
                 values = parsed.get(u"values") + values
                 last_state = parsed.get(u"state")
             elif stage_type == u"group":
@@ -309,7 +307,7 @@ class DBConnection(object):
                 )
                 if len(parsed.get(u"group_by", [])) > 0:
                     query += u" GROUP BY {}".format(u", ".join(parsed.get(u"group_by")))
-
+                ignore_prefix = False
                 values = parsed.get(u"values") + values
                 last_state = parsed.get(u"state")
             elif stage_type == u"orderby":
@@ -333,7 +331,7 @@ class DBConnection(object):
                 headers,
                 fetched,
                 last_state.get(u"fields"),
-                ignore_prefix=last_state is not None
+                ignore_prefix=ignore_prefix
             )
 
         return [i[0] for i in description], fetched
