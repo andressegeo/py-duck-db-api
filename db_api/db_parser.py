@@ -2,9 +2,9 @@
 
 import datetime
 import calendar
-import re
 import json
 import decimal
+
 
 class DBParser(object):
 
@@ -16,7 +16,8 @@ class DBParser(object):
             u"$gte": u">=",
             u"$lt": u"<",
             u"$lte": u"<=",
-            u"$ne": u"!="
+            u"$ne": u"!=",
+            u"$regex": u"REGEXP"
         }
 
         self._GROUP_OPERATORS = {
