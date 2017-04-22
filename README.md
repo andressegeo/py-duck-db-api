@@ -34,7 +34,7 @@ Then, please consider this project like a version 0.1, far from a final version.
 
 ## How Can I use it in my project ?
 
-First, you need to install it with a pip. :
+First, you need to install it with pip. :
 
 ```bash
 pip install https://github.com/duckswitch/py-db-api.git@master
@@ -86,21 +86,95 @@ Some Examples for this schema :
 getting client "Dummy1 or Dummy2"
 
 ```bash
-GET http://localhost:5000/api/db/user?filters=FILTERS
+GET http://localhost:5000/api/db/client?filters=FILTERS&first=0&nb=100
 ```
 With FILTERS having this value : 
 ```javascript
 {
     "$or": [
         {
-            "client.name": "Dummy1"
+            "name": "Dummy1"
         },
         {
-            "clent.name": "Dummy2"
+            "name": "Dummy2"
         }
     ]
 }
 ```
+
+The API will return :
+
+```javascript
+
+{
+  "first": 0,
+  "items": [
+    {
+      "id": 1,
+      "name": "Dummy1"
+    },
+    {
+      "id": 2,
+      "name": "Dummy2"
+    }
+  ],
+  "nb": 100
+}
+
+```
+More informations on the filter syntax [here](https://docs.mongodb.com/manual/reference/method/db.collection.find/)
+
+### Update data (PUT)
+
+```bash
+PUT http://localhost:5000/api/db/client?filters=FILTERS
+```
+
+This endpoint takes a filter parameter to select what you want to update (see the GET section).
+
+The payload of the request must look like this :
+
+```javascript
+{
+    "$set": {
+        "name": "new name",
+        "firstname": "new first name"
+    }
+}
+```
+
+Be aware that you can't update a data related to a table from the foreign one.
+
+### Insert data (POST)
+
+```bash
+POST http://localhost:5000/api/db/client?filters=FILTERS
+```
+
+A JSON which looks like an item returned from the GET endpoint, but do not forget all required fields.
+
+Example to insert a project, depending on the client Dummy1 :
+
+```javascript
+{
+    "name": "Awesome project",
+    "client": {
+        "id": 1
+    },
+    "provisioned_hours": 999,
+    "started_at": 1451602800
+}
+```
+
+### Delete data (DELETE)
+
+No payload required.
+
+```bash
+DELETE http://localhost:5000/api/db/client?filters=FILTERS
+```
+
+This endpoint takes a filter parameter to select what you want to delete (see the GET section).
 
 # How to contribute
 
