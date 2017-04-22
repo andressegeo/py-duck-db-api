@@ -8,5 +8,6 @@
         "**/*__pycache__": true
     }
 ,
-"python.linting.pylintEnabled": false
+"python.linting.pylintEnabled": false,
+"vsicons.presets.angular": true
 }
