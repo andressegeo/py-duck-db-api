@@ -179,3 +179,16 @@ This endpoint takes a filter parameter to select what you want to delete (see th
 # How to contribute
 
 ## Setting up the project
+
+Install Python2 & virtualenv. Then, just run the setup.sh
+
+```bash
+./setup.sh
+```
+
+If the blueprint in the main.py is well configured to work with your local dateabase, just do
+
+```bash
+source venv/bin/activate
+python2 main.py
+```
