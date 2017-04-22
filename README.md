@@ -192,3 +192,10 @@ If the blueprint in the main.py is well configured to work with your local datea
 source venv/bin/activate
 python2 main.py
 ```
+
+Running the unit tests :
+
+```bash
+source venv/bin/activate
+python2 -m pytest db-api
+```
