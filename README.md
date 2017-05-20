@@ -148,7 +148,7 @@ Be aware that you can't update a data related to a table from the foreign one.
 ### Insert data (POST)
 
 ```bash
-POST http://localhost:5000/api/db/client?filters=FILTERS
+POST http://localhost:5000/api/db/client
 ```
 
 A JSON which looks like an item returned from the GET endpoint, but do not forget all required fields.
