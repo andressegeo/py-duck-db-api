@@ -39,19 +39,19 @@ def construct_db_api_blueprint(
     db_api_blueprint = Blueprint(u'db_api', __name__)
 
     # Example : http://localhost:5000/api/db/hour/export?pipeline=[{"$project":{"user_email":"$affected_to.email","id":1}}]&options={"type":"csv","delimiter":";"}
-    @db_api_blueprint.route(u'/db/<string:table>/export', methods=[u"GET"])
+    @db_api_blueprint.route(u'/<string:table>/export', methods=[u"GET"])
     def table_aggregation_export(table):
         return db_flask_api.handle_export(request, table=table)
 
-    @db_api_blueprint.route(u'/db/<string:table>/aggregation', methods=[u"GET", u"POST"])
+    @db_api_blueprint.route(u'/<string:table>/aggregation', methods=[u"GET", u"POST"])
     def table_aggregation(table):
         return db_flask_api.handle_aggregation(request, table=table)
 
-    @db_api_blueprint.route(u'/db/<string:table>', methods=[u"POST", u"PUT", u"DELETE", u"GET"])
+    @db_api_blueprint.route(u'/<string:table>', methods=[u"POST", u"PUT", u"DELETE", u"GET"])
     def table_request(table):
         return db_flask_api.handle_request(request, table=table)
 
-    @db_api_blueprint.route(u'/db/<string:table>/description', methods=[u"GET"])
+    @db_api_blueprint.route(u'/<string:table>/description', methods=[u"GET"])
     def table_description_request(table):
         return db_flask_api.handle_description(request, table=table)
 
