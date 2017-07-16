@@ -2,6 +2,9 @@
 
 
 class DBApi(object):
+    """
+    The class which wraps all the DB Api logic.
+    """
 
     def __init__(
             self,
@@ -10,6 +13,20 @@ class DBApi(object):
     ):
         self._db_connection = db_connection
         self._db_parser_def = db_parser_def
+
+    def get_parser(self, table):
+        """
+        Generate the DB Parser.
+        Args:
+            table (unicode): The name of the table.
+
+        Returns:
+            (DBParser): The parser linked to the table.
+        """
+        return self._db_parser_def(
+            table=table,
+            columns=self._db_connection.get_columns(table)
+        )
 
     def list(self, table, filters=None, order_by=None, order=None, limit=20, offset=0):
         """
@@ -26,10 +43,7 @@ class DBApi(object):
             ((list), boolean): Result & if there is something next.
         """
         # Generate the parser.
-        db_parser = self._db_parser_def(
-            table=table,
-            columns=self._db_connection.get_columns(table)
-        )
+        db_parser = self.get_parser(table)
         # Generate the initial state.
         base_state = db_parser.generate_base_state()
         #
@@ -60,12 +74,97 @@ class DBApi(object):
 
         return items, has_next
 
+    def create(self, table, item):
+        """
+        This method create an item in the table.
+        Args:
+            table (unicode): The table name.
+            item (dict): The item representation.
 
-    def create(self, item):
-        pass
+        Returns:
+            (int): The ID of the created item.
+        """
+        # Generate the parser.
+        db_parser = self.get_parser(table)
+        # Generate insert stmt.
+        insert = db_parser.parse_insert(data=item)
 
-    def update(self, filters, item):
-        pass
+        return self._db_connection.insert(
+            table=db_parser._table,
+            fields=insert[u"fields"],
+            positional_values=insert[u'positional_values'],
+            values=insert[u"values"]
+        )
 
-    def delete(self, filters):
-        pass
+    def update(self, table, filters, item):
+        """
+        This method update the table regarding the filters.
+        Args:
+            table (unicode): The table name.
+            filters (dict): Where to update the items.
+            item (dict): The updated values.
+
+        Returns:
+            (int): The number of updated items.
+        """
+        db_parser = self.get_parser(table)
+        base_state = db_parser.generate_base_state()
+        filters = db_parser.parse_match(
+            match=filters,
+            from_state=base_state,
+            use_alias=False
+        )
+
+        count = self._db_connection.update(
+            table=table,
+            update=db_parser.parse_update(
+                data=item
+            ),
+            joins=base_state.get(u"joins"),
+            where=filters
+        )
+
+        return count
+
+    def delete(self, table, filters):
+        """
+        This method delete items from the table regarding the filters.
+        Args:
+            table (unicode): The table name.
+            filters (dict): Where to update the items.
+
+        Returns:
+            (int): The number of updated items.
+        """
+        db_parser = self.get_parser(table)
+        base_state = db_parser.generate_base_state()
+        filters = db_parser.parse_match(
+            match=filters,
+            from_state=base_state,
+            use_alias=False
+        )
+
+        if filters.get(u"statements") == u"":
+            raise ValueError(u"You need to set a proper filter to delete (safe mode)")
+
+        return self._db_connection.delete(
+            table=table,
+            joins=base_state.get(u"joins"),
+            where=filters,
+        )
+
+    def description(self, table):
+        """
+        Generate a description of the table.
+        Args:
+            table (unicode): The table name.
+
+        Returns:
+            (dict): The description.
+        """
+        db_parser = self.get_parser(table)
+        return db_parser.generate_column_description(
+            table=table,
+            columns=list(db_parser._base_columns)
+        )
+

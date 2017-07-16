@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
-from flask import jsonify, make_response
+from flask import jsonify, make_response, Blueprint, request
 from collections import OrderedDict
 import json
 
@@ -10,27 +10,9 @@ class DBFlaskAPI(object):
 
     def __init__(
             self,
-            db_api_def,
-            db_user,
-            db_password,
-            db_name,
-            db_connection_def,
-            db_parser_def,
-            db_host,
-            db_export_def
+            db_api
     ):
-        self.__db_parser_def = db_parser_def
-        self.__db_api_def = db_api_def
-
-        self.db_connection = db_connection_def(
-            db_api_def=db_api_def,
-            user=db_user,
-            password=db_password,
-            database=db_name,
-            host=db_host
-        )
-
-        self.db_export = db_export_def()
+        self._db_api = db_api
 
     def handle_export(self, request, table):
         code = 200
@@ -84,25 +66,7 @@ class DBFlaskAPI(object):
         output.headers[U"Content-type"] = U"text/csv"
         return output, code
 
-    def handle_description(self, request, table):
-        code = 200
 
-        columns = self.db_connection.get_columns(table)
-
-        db_parser = self.__db_parser_def(
-            table=table,
-            columns=columns
-        )
-
-        result = {
-            u"fields": db_parser.generate_column_description(
-                table=table,
-                columns=columns
-            ),
-            u"table": table
-        }
-
-        return jsonify(result), code
 
     def _pipeline_to_stages(self, db_parser, pipeline):
         base_state = db_parser.generate_base_state()
@@ -194,22 +158,35 @@ class DBFlaskAPI(object):
         result[u'items'] = items
         return jsonify(result), code
 
+    def construct_blueprint(self):
+
+        db_api_blueprint = Blueprint(u'db_api', __name__)
+
+        @db_api_blueprint.route(u'/<string:table>', methods=[u"POST", u"PUT", u"DELETE", u"GET"])
+        def table_request(table):
+            return self.handle_request(request, table=table)
+
+        @db_api_blueprint.route(u'/<string:table>/description', methods=[u"GET"])
+        def table_description_request(table):
+            return self.handle_description(request, table=table)
+
+        return db_api_blueprint
+
+    def handle_description(self, request, table):
+        result = self._db_api.description(table)
+        return jsonify(result), 200
+    
     def handle_request(self, request, table):
         result = {}
-
         code = 200
-        db_parser = self.__db_parser_def(
-            table=table,
-            columns=self.db_connection.get_columns(table)
-        )
-
         filters = request.args.get(u'filters')
         order_by = request.args.get(u"order_by")
-        export_to = request.args.get(u'export_to')
         data = request.data
 
         if filters is not None:
             filters = json.loads(filters, encoding=u"utf-8")
+        else:
+            filters = {}
 
         if order_by is not None:
             order_by = json.loads(
@@ -217,105 +194,63 @@ class DBFlaskAPI(object):
                 encoding=u"utf-8",
                 object_pairs_hook=OrderedDict
             )
+        else:
+            order_by = {}
 
         if data is not None and data != u"":
             data = json.loads(data, encoding=u"utf-8")
 
-        base_state = db_parser.generate_base_state()
+        if request.method == u"GET":
+            first = int(request.args.get(u'first', 0))
+            nb = int(request.args.get(u'nb', 100))
 
-        try:
-            if request.method == u"GET":
-                filters = db_parser.parse_match(
-                    match=filters,
-                    from_state=base_state
-                )
+            items, has_next = self._db_api.list(
+                table=table,
+                filters=filters,
+                limit=nb,
+                offset=first,
+                order_by=[key for key in order_by],
+                order=[order_by[key] for key in order_by]
+            )
 
-                order_by = db_parser.parse_order_by_dict(
-                    order_by=order_by,
-                    from_state=base_state
-                )
-                items = self.db_connection.select(
-                    fields=base_state.get(u"fields"),
-                    table=table,
-                    joins=base_state.get(u"joins"),
-                    where=filters,
-                    formatter=db_parser.rows_to_formated,
-                    order_by=order_by,
-                    first=request.args.get(u"first"),
-                    nb=request.args.get(u"nb")
-                )
-
-                result = {
-                    u"items": items,
-                    u"first": int(request.args.get(u'first', 0)),
-                    u"nb": int(request.args.get(u'nb', 100))
-                }
-
-            elif request.method == u"PUT":
-                filters = db_parser.parse_match(
-                    match=filters,
-                    from_state=base_state,
-                    use_alias=False
-                )
-                count = self.db_connection.update(
-                    table=table,
-                    update=db_parser.parse_update(
-                        data=data
-                    ),
-                    joins=base_state.get(u"joins"),
-                    where=filters
-                )
-
-                result = {
-                    u"count": count
-                }
-
-            elif request.method == u"DELETE":
-                filters = db_parser.parse_match(
-                    match=filters,
-                    from_state=base_state,
-                    use_alias=False
-                )
-
-                if filters.get(u"statements") == u"":
-                    raise ValueError(u"You need to set a proper filter to delete (safe mode)")
-
-                count = self.db_connection.delete(
-                    table=table,
-                    joins=base_state.get(u"joins"),
-                    where=filters,
-                )
-
-                result = {
-                    u"count": count
-                }
-
-            elif request.method == u"POST":
-
-                insert = db_parser.parse_insert(data=data)
-
-                count = self.db_connection.insert(
-                    table=db_parser._table,
-                    fields=insert[u"fields"],
-                    positional_values=insert[u'positional_values'],
-                    values=insert[u"values"]
-                )
-
-                result = {
-                    u"id": count
-                }
-
-                code = 201
-        except ValueError as e:
             result = {
-                u"message": unicode(e)
+                u"items": items,
+                u"first": first,
+                u"nb": nb,
+                u"has_next": has_next
             }
-            code = 422
 
-        except self.__db_api_def.OperationalError as e:
+        elif request.method == u"PUT":
+            count = self._db_api.update(
+                table=table,
+                filters=filters,
+                item=data
+            )
+
             result = {
-                u"message": unicode(e[1])
+                u"count": count
             }
-            code = 422
+
+        elif request.method == u"DELETE":
+            count = self._db_api.delete(
+                table=table,
+                filters=filters
+            )
+
+            result = {
+                u"count": count
+            }
+
+        elif request.method == u"POST":
+            created_id = self._db_api.create(
+                table=table,
+                item=data
+            )
+
+            result = {
+                u"id": created_id
+            }
+
+            code = 201
 
         return jsonify(result), code

@@ -12,3 +12,24 @@ DB_API = build_db_api(
 )
 
 result, has_next = DB_API.list(table=u"project", limit=2)
+
+created_id = DB_API.create(u"client", {
+     u"name": u"pouet"
+})
+
+count = DB_API.update(u"client", filters={
+    u"id": 19
+}, item={
+    u"$set": {
+        u"name": u"pouet1234"
+    }
+})
+
+count = DB_API.delete(u"client", filters={
+    u"name": {
+        u"$regex": u"pouet"
+    }
+})
+
+
+hour_description = DB_API.description(u"hour")
