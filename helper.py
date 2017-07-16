@@ -33,3 +33,10 @@ count = DB_API.delete(u"client", filters={
 
 
 hour_description = DB_API.description(u"hour")
+
+result = DB_API.aggregate(u"project", pipeline=[{
+    u"$project": {
+        u"name": u"$name"
+    }
+}])
+print(result)

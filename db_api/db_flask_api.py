@@ -14,13 +14,34 @@ class DBFlaskAPI(object):
     ):
         self._db_api = db_api
 
+    def construct_blueprint(self):
+
+        db_api_blueprint = Blueprint(u'db_api', __name__)
+
+        @db_api_blueprint.route(u'/<string:table>/export', methods=[u"GET"])
+        def table_aggregation_export(table):
+            return self.handle_export(request, table=table)
+
+        @db_api_blueprint.route(u'/<string:table>', methods=[u"POST", u"PUT", u"DELETE", u"GET"])
+        def table_request(table):
+            return self.handle_request(request, table=table)
+
+        @db_api_blueprint.route(u'/<string:table>/aggregation', methods=[u"GET", u"POST"])
+        def table_aggregation(table):
+            return self.handle_aggregation(request, table=table)
+
+        @db_api_blueprint.route(u'/<string:table>/description', methods=[u"GET"])
+        def table_description_request(table):
+            return self.handle_description(request, table=table)
+
+        return db_api_blueprint
+
     def handle_export(self, request, table):
         code = 200
 
         params = {
             u"pipeline": None,
-            u"filters": None,
-            u"options": {}
+            u"filters": None
         }
 
         for key in params:
@@ -28,112 +49,17 @@ class DBFlaskAPI(object):
             if var is not None:
                 params[key] = json.loads(var, encoding=u"utf-8")
 
-        db_parser = self.__db_parser_def(
-            table=table,
-            columns=self.db_connection.get_columns(table)
-        )
-        base_state = db_parser.generate_base_state()
-        if params[u"pipeline"] is not None:
-            stages = self._pipeline_to_stages(
-                db_parser=db_parser,
-                pipeline=params[u"pipeline"]
-            )
+        params[u"table"] = table
+        headers, rows = self._db_api.export(**params)
 
-            headers, rows = self.db_connection.aggregate(
-                table,
-                base_state=base_state,
-                stages=stages
-            )
-
-        elif params[u"filters"] is not None:
-            filters = db_parser.parse_match(match=params[u"filters"], from_state=base_state)
-            headers, rows = self.db_connection.select(
-                fields=base_state.get(u"fields"),
-                table=table,
-                joins=base_state.get(u"joins"),
-                where=filters,
-                first=request.args.get(u"first"),
-                nb=request.args.get(u"nb")
-            )
-        else:
-            return jsonify({
-                u"message": u"Unrecognized export"
-            }), 422
-
-        export = self.db_export.export(headers, rows, params[u"options"])
+        export = self._db_api.export_to_csv(headers, rows, {})
         output = make_response(export.getvalue())
         output.headers[U"Content-Disposition"] = U"attachment; filename=export.csv"
         output.headers[U"Content-type"] = U"text/csv"
         return output, code
 
-
-
-    def _pipeline_to_stages(self, db_parser, pipeline):
-        base_state = db_parser.generate_base_state()
-        stages = []
-        custom_state = None
-
-        for stage in pipeline:
-            if u"$match" in stage:
-                ret = db_parser.parse_match(
-                    match=stage.get(u"$match", {}),
-                    from_state=custom_state or base_state
-                )
-                stages.append(
-                    {
-                        u"type": u"match",
-                        u"parsed": ret
-                    }
-                )
-            elif u"$project" in stage:
-                ret = db_parser.parse_project(
-                    stage.get(u"$project"),
-                    from_state=custom_state or base_state
-                )
-                stages.append(
-                    {
-                        u"type": u"project",
-                        u"parsed": ret
-                    }
-                )
-                # Project alter the state. Use custom one
-                custom_state = ret[u'state']
-            elif u"$group" in stage:
-                ret = db_parser.parse_group(
-                    group=stage.get(u"$group"),
-                    from_state=custom_state or base_state
-                )
-                stages.append(
-                    {
-                        u"type": u"group",
-                        u"parsed": ret
-                    }
-                )
-                # Group alter the state. Use custom one
-                custom_state = ret[u'state']
-            elif u"$orderby" in stage:
-                ret = db_parser.parse_order_by(
-                    order_by=stage.get(u"$orderby"),
-                    from_state=custom_state or base_state
-                )
-                stages.append(
-                    {
-                        u"type": u"orderby",
-                        u"parsed": ret
-                    }
-                )
-
-        return stages
-
     def handle_aggregation(self, request, table):
-        result = {}
-
         code = 200
-        db_parser = self.__db_parser_def(
-            table=table,
-            columns=self.db_connection.get_columns(table)
-        )
-
         # Get pipeline from payload or url arg
         data = request.data
 
@@ -143,39 +69,13 @@ class DBFlaskAPI(object):
             data = { u"pipeline": [] }
         pipeline = json.loads(request.args.get(u'pipeline', u"[]")) or data.get(u"pipeline", [])
 
-        stages = self._pipeline_to_stages(
-            db_parser=db_parser,
-            pipeline=pipeline
-        )
-
-        items = self.db_connection.aggregate(
-            table,
-            db_parser.generate_base_state(),
-            stages,
-            formater=db_parser.rows_to_formated
-        )
-
-        result[u'items'] = items
+        result = self._db_api.aggregate(table, pipeline)
         return jsonify(result), code
-
-    def construct_blueprint(self):
-
-        db_api_blueprint = Blueprint(u'db_api', __name__)
-
-        @db_api_blueprint.route(u'/<string:table>', methods=[u"POST", u"PUT", u"DELETE", u"GET"])
-        def table_request(table):
-            return self.handle_request(request, table=table)
-
-        @db_api_blueprint.route(u'/<string:table>/description', methods=[u"GET"])
-        def table_description_request(table):
-            return self.handle_description(request, table=table)
-
-        return db_api_blueprint
 
     def handle_description(self, request, table):
         result = self._db_api.description(table)
         return jsonify(result), 200
-    
+
     def handle_request(self, request, table):
         result = {}
         code = 200

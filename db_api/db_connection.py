@@ -234,8 +234,6 @@ class DBConnection(object):
     ):
         if first is None:
             first = 0
-        if nb is None:
-            nb = 100
 
         headers, query = self._base_query(fields, table, joins)
 
@@ -245,9 +243,15 @@ class DBConnection(object):
         if order_by is not None and order_by[u"statements"] != u"":
             query += u" ORDER BY " + order_by[u"statements"]
 
-        query += u" LIMIT %s OFFSET %s"
-        fetched, description = self._execute(query, (where[u'values'] + [int(nb), int(first)]))
-        # If formater in parameter
+        values = where[u'values']
+        if nb is not None:
+            query += u" LIMIT %s"
+            values.append(int(nb))
+            query += u" OFFSET %s"
+            values.append(int(first))
+
+        fetched, description = self._execute(query, values)
+        # If formatter in parameter
         if formatter is not None:
             return formatter(
                 headers,

@@ -198,7 +198,7 @@ def test_parse_update(db_parser):
 
 
 def test_parse_order_by(db_parser):
-    ret = db_parser.parse_order_by(order_by={
+    ret = db_parser.parse_order_by_dict(order_by={
         u"id": 1,
         u"contact.id": -1
     },

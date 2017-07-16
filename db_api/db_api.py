@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import csv
+import StringIO
 
 class DBApi(object):
     """
@@ -13,6 +15,69 @@ class DBApi(object):
     ):
         self._db_connection = db_connection
         self._db_parser_def = db_parser_def
+
+    def export(self, table, filters=None, pipeline=None):
+        """
+
+        Args:
+            table:
+            filters:
+            pipeline:
+            offset:
+            limit:
+
+        Returns:
+
+        """
+        db_parser = self.get_parser(table)
+        base_state = db_parser.generate_base_state()
+
+        if not filters and not pipeline:
+            filters = {}
+
+        if pipeline is not None:
+            stages = self._pipeline_to_stages(
+                db_parser=db_parser,
+                pipeline=pipeline
+            )
+
+            headers, rows = self._db_connection.aggregate(
+                table,
+                base_state=base_state,
+                stages=stages
+            )
+
+        elif filters is not None:
+            filters = db_parser.parse_match(
+                match=filters,
+                from_state=base_state
+            )
+            headers, rows = self._db_connection.select(
+                fields=base_state.get(u"fields"),
+                table=table,
+                joins=base_state.get(u"joins"),
+                where=filters,
+                first=0,
+                nb=None
+            )
+        return headers, rows
+
+    @staticmethod
+    def export_to_csv(headers, rows, options):
+
+        output = StringIO.StringIO()
+        encoding = options.get(u"encoding", u"utf-8")
+        # Open parsers
+        writer = csv.writer(
+            output,
+            delimiter=options.get(u"delimiter", u"\t").encode(encoding)
+        )
+
+        for row in [headers] + list(rows):
+            line = [unicode(cell).encode(encoding) for cell in row]
+            writer.writerow(line)
+
+        return output
 
     def get_parser(self, table):
         """
@@ -168,3 +233,86 @@ class DBApi(object):
             columns=list(db_parser._base_columns)
         )
 
+    def aggregate(self, table, pipeline):
+        """
+        Do an aggregate request.
+        Args:
+            table (unicode): The table name.
+            pipeline (list): A list of dict representing the pipeline.
+
+        Returns:
+            (list): A list of item resulting the request.
+        """
+        db_parser = self.get_parser(table)
+        db_parser.generate_base_state()
+
+        stages = self._pipeline_to_stages(
+            db_parser=db_parser,
+            pipeline=pipeline
+        )
+
+        items = self._db_connection.aggregate(
+            table,
+            db_parser.generate_base_state(),
+            stages,
+            formater=db_parser.rows_to_formated
+        )
+
+        return items
+
+    def _pipeline_to_stages(self, db_parser, pipeline):
+        base_state = db_parser.generate_base_state()
+        stages = []
+        custom_state = None
+
+        for stage in pipeline:
+            if u"$match" in stage:
+                ret = db_parser.parse_match(
+                    match=stage.get(u"$match", {}),
+                    from_state=custom_state or base_state
+                )
+                stages.append(
+                    {
+                        u"type": u"match",
+                        u"parsed": ret
+                    }
+                )
+            elif u"$project" in stage:
+                ret = db_parser.parse_project(
+                    stage.get(u"$project"),
+                    from_state=custom_state or base_state
+                )
+                stages.append(
+                    {
+                        u"type": u"project",
+                        u"parsed": ret
+                    }
+                )
+                # Project alter the state. Use custom one
+                custom_state = ret[u'state']
+            elif u"$group" in stage:
+                ret = db_parser.parse_group(
+                    group=stage.get(u"$group"),
+                    from_state=custom_state or base_state
+                )
+                stages.append(
+                    {
+                        u"type": u"group",
+                        u"parsed": ret
+                    }
+                )
+                # Group alter the state. Use custom one
+                custom_state = ret[u'state']
+            elif u"$orderby" in stage:
+                ret = db_parser.parse_order_by(
+                    order_by=stage.get(u"$orderby"),
+                    from_state=custom_state or base_state
+                )
+                stages.append(
+                    {
+                        u"type": u"orderby",
+                        u"parsed": ret
+                    }
+                )
+
+        return stages
