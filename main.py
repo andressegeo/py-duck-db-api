@@ -23,7 +23,7 @@ app.register_blueprint(construct_db_api_blueprint(
     db_user=u"root",
     db_passwd=u"localroot1234",
     db_name=u"hours_count_naitways"
-), url_prefix=u'/api')
+), url_prefix=u'/api/db')
 
 if __name__ == u"__main__":
     app.run(debug=True)

@@ -9,7 +9,7 @@ import decimal
 class DBParser(object):
 
     def __init__(self, table, columns):
-
+        
         self._OPERATORS = {
             u"$eq": u"=",
             u"$gt": u">",
@@ -362,8 +362,6 @@ class DBParser(object):
             })
 
         ret[u'statements'] = u", ".join(ret[u'statements'])
-        import json
-        print(json.dumps(ret, indent=4))
         return ret
 
     def find_col_field(self, key, field_key=u"alias"):
@@ -376,11 +374,42 @@ class DBParser(object):
                     return field.get(field_key)
         return None
 
-    def parse_order_by(self, order_by, from_state):
+    def parse_order_by(self, order_by, order, from_state):
+        """
+        Generate an order by request.
+        Args:
+            order_by (list): The fields to order.
+            order (list): The order for each field of the order_by param (1 or -1).
+            from_state (dict): state from a previous request.
 
-        order_by = self.to_one_level_json(order_by) or {}
+        Returns:
+            (dict): The new state.
+        """
         self._last_state = from_state
+        order_by = order_by or []
+        order = order or []
+        ret = {
+            u"statements": []
+        }
+        if len(order_by) != len(order):
+            raise ValueError(u"order & order_by are not the same size.")
 
+        for index, key in enumerate(order_by):
+            field = self.get_field(key.split(u"."))
+            if order[index] in [1, -1]:
+                order_stmt = u"ASC" if order[index] == 1 else u"DESC"
+                ret[u"statements"].append(
+                    u"`{}` {}".format(u".".join(field.get(u"path") + [field.get(u"name")]), order_stmt)
+                )
+
+            else:
+                raise ValueError(u"Order value must be -1 or 1.")
+        ret[u'statements'] = u", ".join(ret[u'statements'])
+        return ret
+
+    def parse_order_by_dict(self, order_by, from_state):
+        order_by = order_by or {}
+        self._last_state = from_state
         ret = {
             u"statements": []
         }

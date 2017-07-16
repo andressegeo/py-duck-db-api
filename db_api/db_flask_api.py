@@ -2,6 +2,7 @@
 
 
 from flask import jsonify, make_response
+from collections import OrderedDict
 import json
 
 
@@ -211,7 +212,11 @@ class DBFlaskAPI(object):
             filters = json.loads(filters, encoding=u"utf-8")
 
         if order_by is not None:
-            order_by = json.loads(order_by, encoding=u"utf-8")
+            order_by = json.loads(
+                order_by,
+                encoding=u"utf-8",
+                object_pairs_hook=OrderedDict
+            )
 
         if data is not None and data != u"":
             data = json.loads(data, encoding=u"utf-8")
@@ -225,7 +230,7 @@ class DBFlaskAPI(object):
                     from_state=base_state
                 )
 
-                order_by = db_parser.parse_order_by(
+                order_by = db_parser.parse_order_by_dict(
                     order_by=order_by,
                     from_state=base_state
                 )

@@ -2,6 +2,7 @@
 
 import pytest
 import json
+from collections import OrderedDict
 from db_parser import DBParser
 
 
@@ -331,15 +332,30 @@ def test_parse_project(db_parser):
     assert ret[u"statements"] == u"`hour.id` AS %s, `hour.affected_to.email` AS %s, `hour.issue` AS %s"
 
 
-def test_parse_order_by(db_parser):
-    ret = db_parser.parse_order_by(order_by={
-        u"affected_to.email": 1,
-        u"minutes": -1
-    },
+def test_parse_order_by_dict(db_parser):
+    order_param = json.loads(
+        u"""
+        {
+            "started_at": 1,
+            "affected_to.email": 1,
+            "minutes": -1
+        }
+        """,
+        object_pairs_hook=OrderedDict
+    )
+    ret = db_parser.parse_order_by_dict(
+        order_by=order_param,
         from_state=db_parser.generate_base_state()
     )
+    assert ret[u"statements"] == u"`hour.started_at` ASC, `hour.affected_to.email` ASC, `hour.minutes` DESC"
 
-    assert ret[u"statements"] == u"`hour.affected_to.email` ASC, `hour.minutes` DESC"
+def test_parse_order_by(db_parser):
+    ret = db_parser.parse_order_by(
+        order_by=[u"started_at", u"affected_to.email", u"minutes"],
+        order=[1, 1, -1],
+        from_state=db_parser.generate_base_state()
+    )
+    assert ret[u"statements"] == u"`hour.started_at` ASC, `hour.affected_to.email` ASC, `hour.minutes` DESC"
 
 
 def test_parse_group(db_parser):

@@ -251,14 +251,5 @@ def test_parse_group(db_parser):
         },
         from_state=db_parser.generate_base_state()
     )
-    print(json.dumps({
-            u"_id": {
-                u"company": u"$company.contact.id"
-            },
-            u"ids_sum": {
-                u"$sum": u"$contact.id"
-            }
-        }, indent=4))
-    print(json.dumps(ret, indent=4))
 
 # localhost:5000/api/db/user/aggregation/?pipeline={"_id":{"id":"$id"},"ids_sum":{"$sum":"$contact.id"}}
