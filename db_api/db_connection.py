@@ -17,7 +17,6 @@ class DBConnection(object):
         self._password = password
         self._database = database
         self._referenced_cache = {}
-        self.connect()
 
     def connect(self):
         db = self._db_api_def.connect(
