@@ -51,21 +51,23 @@ from db_api.db_connection import DBConnection
 # Import SQL Driver
 import MySQLdb
 
-app = Flask(__name__)
-# register the supplied blueprint
-app.register_blueprint(
-    construct_db_api_blueprint(
-        db_driver=MySQLdb,
-        db_host=u"127.0.0.1",
-        db_user=u"username",
-        db_passwd=u"myusernamepassword",
-        db_name=u"mydatabase"
-    ), 
-    url_prefix=u'/api'
+APP = Flask(__name__)
+
+DB_API = build_db_api(
+    db_api_def=MySQLdb,
+    db_name=u"hours_count",
+    db_password=u"localroot1234",
+    db_user=u"root",
+    db_host=u"127.0.0.1"
 )
 
+db_flask_api = DBFlaskAPI(DB_API)
+db_blueprint = db_flask_api.construct_blueprint()
+APP.register_blueprint(db_blueprint, url_prefix=u'/api/db')
+
 if __name__ == u"__main__":
-    app.run(debug=True)
+    APP.run(debug=True)
+
 ```
 
 ## Use the web service
