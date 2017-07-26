@@ -6,7 +6,7 @@ from collections import OrderedDict
 import json
 
 
-class DBFlaskAPI(object):
+class FlaskDBApi(object):
 
     def __init__(
             self,
