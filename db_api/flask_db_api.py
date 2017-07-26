@@ -73,8 +73,10 @@ class FlaskDBApi(object):
         return jsonify(result), code
 
     def handle_description(self, request, table):
-        result = self._db_api.description(table)
-        return jsonify(result), 200
+        fields = self._db_api.description(table)
+        return jsonify({
+            u"fields": fields
+        }), 200
 
     def handle_request(self, request, table):
         result = {}
