@@ -41,7 +41,7 @@ class DBApi(object):
                 pipeline=pipeline
             )
 
-            headers, rows = self._db_connection.aggregate(
+            (headers, rows), _ = self._db_connection.aggregate(
                 table,
                 base_state=base_state,
                 stages=stages
@@ -52,13 +52,13 @@ class DBApi(object):
                 match=filters,
                 from_state=base_state
             )
-            headers, rows = self._db_connection.select(
+            (headers, rows), _ = self._db_connection.select(
                 fields=base_state.get(u"fields"),
                 table=table,
                 joins=base_state.get(u"joins"),
                 where=filters,
                 first=0,
-                nb=None
+                nb=9999999999
             )
         return headers, rows
 
@@ -121,7 +121,7 @@ class DBApi(object):
             order=order or [],
             from_state=base_state
         )
-        items = self._db_connection.select(
+        items, has_next = self._db_connection.select(
             fields=base_state.get(u"fields"),
             table=table,
             joins=base_state.get(u"joins"),
@@ -129,13 +129,8 @@ class DBApi(object):
             formatter=db_parser.rows_to_formated,
             order_by=order_by,
             first=offset,
-            nb=limit+1
+            nb=limit
         )
-
-        has_next = len(items) > limit
-        if has_next:
-            items.pop(-1)
-
         return items, has_next
 
     def create(self, table, item):

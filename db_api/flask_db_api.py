@@ -50,7 +50,7 @@ class FlaskDBApi(object):
                 params[key] = json.loads(var, encoding=u"utf-8")
 
         params[u"table"] = table
-        (headers, rows), _ = self._db_api.export(**params)
+        headers, rows = self._db_api.export(**params)
 
         export = self._db_api.export_to_csv(headers, rows, {})
         output = make_response(export.getvalue())

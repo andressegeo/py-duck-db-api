@@ -243,14 +243,15 @@ class DBConnection(object):
         if order_by is not None and order_by[u"statements"] != u"":
             query += u" ORDER BY " + order_by[u"statements"]
 
-        values = where[u'values']
-        if nb is not None:
-            query += u" LIMIT %s"
-            values.append(int(nb))
-            query += u" OFFSET %s"
-            values.append(int(first))
-
+        values = where[u'values'] + [nb+1, first]
+        query += u" LIMIT %s OFFSET %s"
         fetched, description = self._execute(query, values)
+
+        has_next = False
+        if len(fetched) > nb:
+            has_next = True
+            fetched = fetched[:1]
+
         # If formatter in parameter
         if formatter is not None:
             return formatter(
@@ -258,9 +259,9 @@ class DBConnection(object):
                 fetched,
                 fields,
                 ignore_prefix=True
-            )
+            ), has_next
 
-        return [i[0] for i in description], fetched
+        return ([i[0] for i in description], fetched), has_next
 
     def aggregate(self, table, base_state, stages=None, formatter=None, skip=0, limit=100):
         """
