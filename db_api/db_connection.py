@@ -250,7 +250,7 @@ class DBConnection(object):
         has_next = False
         if len(fetched) > nb:
             has_next = True
-            fetched = fetched[:1]
+            fetched = fetched[:-1]
 
         # If formatter in parameter
         if formatter is not None:
@@ -344,7 +344,7 @@ class DBConnection(object):
         has_next = False
         if len(fetched) > limit:
             has_next = True
-            fetched = fetched[:1]
+            fetched = fetched[:-1]
 
         headers = [
             u".".join(field.get(u"path") + [field.get(u"name")])
