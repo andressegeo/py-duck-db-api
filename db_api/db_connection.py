@@ -262,7 +262,20 @@ class DBConnection(object):
 
         return [i[0] for i in description], fetched
 
-    def aggregate(self, table, base_state, stages=None, formater=None):
+    def aggregate(self, table, base_state, stages=None, formatter=None, skip=0, limit=100):
+        """
+        Generate the Aggregation query.
+        Args:
+            table (unicode): The table to query.
+            base_state (dict): The state we are starting from.
+            stages (list): The differents stage to interpret from the pipeline.
+            formatter (funct): A method to format output.
+            skip (int): how many lines we skip.
+            limit (int): Max line count we want.
+
+        Returns:
+            (list, list): Columns & fetched items.
+        """
         stages = stages or []
         ignore_prefix = True
         headers, query = self._base_query(
@@ -276,6 +289,7 @@ class DBConnection(object):
         values = []
         last_state = None
         # For each stage
+        index = 0
         for index, stage in enumerate(stages):
 
             parsed = stage.get(u"parsed")
@@ -321,23 +335,31 @@ class DBConnection(object):
                 if parsed.get(u"statements", u"") != u"":
                     query += u" ORDER BY {}".format(parsed.get(u"statements"))
 
+        query = u"SELECT * FROM ({}) AS s_{} LIMIT {} OFFSET {}".format(query, index+1, limit+1, skip)
+
         last_state = last_state or base_state
         fetched, description = self._execute(query, values)
+
+        has_next = False
+        if len(fetched) > limit:
+            has_next = True
+            fetched = fetched[:1]
 
         headers = [
             u".".join(field.get(u"path") + [field.get(u"name")])
             for field in last_state.get(u"fields", [])
         ]
+
         # If formatter in parameter
-        if formater is not None:
-            return formater(
+        if formatter is not None:
+            return formatter(
                 headers,
                 fetched,
                 last_state.get(u"fields"),
                 ignore_prefix=ignore_prefix
-            )
+            ), has_next
 
-        return [i[0] for i in description], fetched
+        return ([i[0] for i in description], fetched), has_next
 
     def insert(self, table, fields, positional_values, values):
         db = self.connect()

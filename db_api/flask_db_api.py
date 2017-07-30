@@ -59,7 +59,8 @@ class FlaskDBApi(object):
         return output, code
 
     def handle_aggregation(self, request, table):
-        code = 200
+        skip = int(request.args.get(u'skip', 0))
+        limit = int(request.args.get(u'limit', 100))
         # Get pipeline from payload or url arg
         data = request.data
 
@@ -69,8 +70,14 @@ class FlaskDBApi(object):
             data = { u"pipeline": [] }
         pipeline = json.loads(request.args.get(u'pipeline', u"[]")) or data.get(u"pipeline", [])
 
-        result = self._db_api.aggregate(table, pipeline)
-        return jsonify(result), code
+        items, has_next = self._db_api.aggregate(table, pipeline, skip=skip, limit=limit)
+
+        return jsonify({
+            u"items": items,
+            u"skip": skip,
+            u"limit": limit,
+            u"has_next": has_next
+        }), 200
 
     def handle_description(self, request, table):
         fields = self._db_api.description(table)

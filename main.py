@@ -2,7 +2,7 @@
 
 from flask import Flask
 from db_api.builder import build_db_api
-from db_api.db_flask_api import DBFlaskAPI
+from db_api.flask_db_api import FlaskDBApi
 import MySQLdb
 
 
@@ -16,7 +16,7 @@ DB_API = build_db_api(
     db_host=u"127.0.0.1"
 )
 
-db_flask_api = DBFlaskAPI(DB_API)
+db_flask_api = FlaskDBApi(DB_API)
 db_blueprint = db_flask_api.construct_blueprint()
 APP.register_blueprint(db_blueprint, url_prefix=u'/api/db')
 

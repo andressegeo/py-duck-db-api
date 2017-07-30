@@ -233,12 +233,14 @@ class DBApi(object):
             columns=list(db_parser._base_columns)
         )
 
-    def aggregate(self, table, pipeline):
+    def aggregate(self, table, pipeline, skip=0, limit=100):
         """
         Do an aggregate request.
         Args:
             table (unicode): The table name.
             pipeline (list): A list of dict representing the pipeline.
+            skip (int): Number of row to pass.
+            limit (int): Max rows count returned.
 
         Returns:
             (list): A list of item resulting the request.
@@ -251,14 +253,16 @@ class DBApi(object):
             pipeline=pipeline
         )
 
-        items = self._db_connection.aggregate(
+        items, has_next = self._db_connection.aggregate(
             table,
             db_parser.generate_base_state(),
             stages,
-            formater=db_parser.rows_to_formated
+            skip=skip,
+            limit=limit,
+            formatter=db_parser.rows_to_formated
         )
 
-        return items
+        return items, has_next
 
     def _pipeline_to_stages(self, db_parser, pipeline):
         base_state = db_parser.generate_base_state()
