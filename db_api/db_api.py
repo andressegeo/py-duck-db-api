@@ -72,7 +72,6 @@ class DBApi(object):
             output,
             delimiter=options.get(u"delimiter", u"\t").encode(encoding)
         )
-
         for row in [headers] + list(rows):
             line = [unicode(cell).encode(encoding) for cell in row]
             writer.writerow(line)
@@ -308,7 +307,7 @@ class DBApi(object):
                 # Group alter the state. Use custom one
                 custom_state = ret[u'state']
             elif u"$orderby" in stage:
-                ret = db_parser.parse_order_by(
+                ret = db_parser.parse_order_by_dict(
                     order_by=stage.get(u"$orderby"),
                     from_state=custom_state or base_state
                 )

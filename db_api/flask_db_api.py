@@ -50,7 +50,7 @@ class FlaskDBApi(object):
                 params[key] = json.loads(var, encoding=u"utf-8")
 
         params[u"table"] = table
-        headers, rows = self._db_api.export(**params)
+        (headers, rows), _ = self._db_api.export(**params)
 
         export = self._db_api.export_to_csv(headers, rows, {})
         output = make_response(export.getvalue())
@@ -65,7 +65,12 @@ class FlaskDBApi(object):
         data = request.data
 
         if data is not None and data != u"":
-            data = json.loads(data, encoding=u"utf-8")
+            # data = json.loads(data, encoding=u"utf-8")
+            data = json.loads(
+                data,
+                encoding=u"utf-8",
+                object_pairs_hook=OrderedDict
+            )
         else:
             data = { u"pipeline": [] }
         pipeline = json.loads(request.args.get(u'pipeline', u"[]")) or data.get(u"pipeline", [])
