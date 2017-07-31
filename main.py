@@ -13,7 +13,8 @@ DB_API = build_db_api(
     db_name=u"hours_count",
     db_password=u"localroot1234",
     db_user=u"root",
-    db_host=u"127.0.0.1"
+    db_host=u"127.0.0.1",
+    db_unix_socket=None
 )
 
 db_flask_api = FlaskDBApi(DB_API)

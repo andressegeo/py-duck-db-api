@@ -9,24 +9,31 @@ class DBConnection(object):
             user,
             password,
             database,
-            host=u"127.0.0.1"):
+            unix_socket,
+            host
+        ):
 
         self._db_api_def = db_api_def
         self._host = host
         self._user = user
         self._password = password
         self._database = database
+        self._unix_socket = unix_socket
         self._referenced_cache = {}
-
+        
     def connect(self):
-        db = self._db_api_def.connect(
-            host=self._host,
-            user=self._user,
-            passwd=self._password,
-            db=self._database,
-            charset=u"utf8"
-        )
-        return db
+        params = {
+            u"user": self._user,
+            u"passwd": self._password,
+            u"db": self._database,
+            u"charset": u"utf8"
+        }
+        
+        if self._host:
+            params[u"host"] = self._host
+        else:
+            params[u"unix_socket"] = self._unix_socket
+        return self._db_api_def.connect(**params)
 
     def _execute(self, query, values=None, custom_cursor=None):
         """

@@ -10,7 +10,8 @@ def build_db_api(
     db_user,
     db_password,
     db_name,
-    db_host=u"127.0.0.1"
+    db_host=None,
+    db_unix_socket=None
 ):
     """
     Build the DB Api.
@@ -31,7 +32,8 @@ def build_db_api(
             user=db_user,
             password=db_password,
             database=db_name,
-            host=db_host
+            host=db_host,
+            unix_socket=db_unix_socket
         ),
         db_parser_def=DBParser
     )
